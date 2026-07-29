@@ -74,17 +74,50 @@
     .stat-box .v { font-size: 16px; font-weight: 800; font-variant-numeric: tabular-nums; }
     .stat-box .s { display: block; margin-top: 2px; font-size: 11px; color: #999; }
 
-    .chart-wrap {
-      position: relative; width: 100%; height: 420px;
+        .chart-wrap {
+      position: relative; width: 100%; height: 500px;
       background: linear-gradient(180deg, #fffef8 0%, #fff 100%);
       border: 1px solid #f0e6c0; border-radius: 12px; overflow: hidden;
     }
     @media (min-width: 720px) {
-      .chart-wrap { height: 480px; }
+      .chart-wrap { height: 580px; }
     }
     @media (min-width: 960px) {
-      .chart-wrap { height: 520px; }
+      .chart-wrap { height: 640px; }
     }
+    .market-grid {
+      display: grid; grid-template-columns: 1fr; gap: 10px; margin-top: 10px;
+    }
+    @media (min-width: 720px) {
+      .market-grid { grid-template-columns: 1.2fr 1fr; }
+    }
+    .market-panel {
+      background: #fffaf0; border: 1px solid #ffe9a8; border-radius: 12px; padding: 10px 12px;
+    }
+    .market-panel h3 {
+      margin: 0 0 8px; font-size: 13px; color: var(--secondary);
+      display:flex; justify-content:space-between; gap:8px; align-items:center;
+    }
+    .market-panel h3 .subk { font-size: 11px; color: var(--muted); font-weight: 500; }
+    .mtable { width: 100%; border-collapse: collapse; font-size: 12px; }
+    .mtable th, .mtable td { padding: 4px 2px; text-align: right; font-variant-numeric: tabular-nums; }
+    .mtable th:first-child, .mtable td:first-child { text-align: left; }
+    .mtable th { color: var(--muted); font-weight: 600; font-size: 11px; }
+    .mtable td.b { font-weight: 800; }
+    .limit-stats {
+      display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 6px;
+    }
+    @media (min-width: 520px) {
+      .limit-stats { grid-template-columns: repeat(6, minmax(0,1fr)); }
+    }
+    .limit-box {
+      background: #fff; border: 1px solid #f0e6c0; border-radius: 10px; padding: 8px 6px; text-align: center;
+    }
+    .limit-box .k { display:block; font-size: 11px; color: var(--muted); margin-bottom: 2px; }
+    .limit-box .v { display:block; font-size: 18px; font-weight: 800; font-variant-numeric: tabular-nums; }
+    .limit-box .s { display:block; font-size: 10px; color: #aaa; margin-top: 2px; min-height: 14px; }
+    .limit-tops { margin-top: 8px; font-size: 11px; color: #666; line-height: 1.55; }
+    .limit-tops b { color: #333; }
     .chart-wrap canvas { width: 100%; height: 100%; display: block; cursor: crosshair; }
     .chart-empty {
       position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
@@ -256,7 +289,39 @@
         <div class="stat-box"><span class="k">净流出板块</span><span class="v" id="stOut">-</span><span class="s">家</span></div>
         <div class="stat-box"><span class="k">列表净额</span><span class="v" id="stNet">-</span><span class="s">亿</span></div>
         <div class="stat-box"><span class="k">最强吸金</span><span class="v" id="stTop" style="font-size:14px">-</span><span class="s" id="stTopFlow">-</span></div>
-      </div>
+      
+
+      <div class="market-grid">
+        <div class="market-panel">
+          <h3>
+            <span>📊 沪深京量能</span>
+            <span class="subk" id="volMeta">实际 / 预测今日 · 亿元</span>
+          </h3>
+          <table class="mtable">
+            <thead>
+              <tr><th>市场</th><th>实际</th><th>预测全天</th><th>进度</th></tr>
+            </thead>
+            <tbody id="volBody">
+              <tr><td colspan="4" style="text-align:center;color:#999">加载中…</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="market-panel">
+          <h3>
+            <span>🚦 涨跌停统计</span>
+            <span class="subk" id="limitMeta">已剔除 ST</span>
+          </h3>
+          <div class="limit-stats" id="limitStats">
+            <div class="limit-box"><span class="k">涨停</span><span class="v up" id="limUp">-</span><span class="s" id="limUpSub">-</span></div>
+            <div class="limit-box"><span class="k">跌停</span><span class="v down" id="limDown">-</span><span class="s" id="limDownSub">-</span></div>
+            <div class="limit-box"><span class="k">炸板</span><span class="v" id="limBroken">-</span><span class="s" id="limBrokenSub">-</span></div>
+            <div class="limit-box"><span class="k">一字</span><span class="v" id="limYizi">-</span><span class="s">涨停池</span></div>
+            <div class="limit-box"><span class="k">连板≥2</span><span class="v" id="limLb2">-</span><span class="s">剔ST</span></div>
+            <div class="limit-box"><span class="k">封板率</span><span class="v" id="limSeal">-</span><span class="s" id="limSealSub">涨停/(涨停+炸板)</span></div>
+          </div>
+          <div class="limit-tops" id="limitTops">涨停/跌停个股将显示在此</div>
+        </div>
+      </div></div>
     </div>
 
     <div class="card" id="trendCard">
@@ -266,10 +331,11 @@
       </div>
       <div class="chart-toolbar">
         <div class="seg" id="trendLimitSeg">
-          <button type="button" class="btn secondary" data-limit="20">20板</button>
-          <button type="button" class="btn active" data-limit="40">40板</button>
+          <button type="button" class="btn active" data-limit="20">20板</button>
+          <button type="button" class="btn secondary" data-limit="40">40板</button>
           <button type="button" class="btn secondary" data-limit="60">60板</button>
         </div>
+        <button id="trendFocusBtn" class="btn secondary" type="button" title="仅显示绝对值最大的前12条">聚焦前12</button>
         <button id="trendRefreshBtn" class="btn secondary" type="button">刷新轨迹</button>
         <span class="status-pill" id="trendStatus">轨迹待命</span>
       </div>
@@ -279,7 +345,7 @@
       </div>
       <div class="chart-legend" id="trendLegend"></div>
       <div class="chart-tip" id="trendTip">
-        覆盖净流入/流出绝对值最大的板块；优先东财分时主力资金，并叠加服务端快照以保持最新。点击图例可显隐单线。
+        默认展示绝对值最大 20 板；端点标签仅标前 8 条并做避让。优先东财分时主力，叠加服务端快照。点击图例可显隐；可用「聚焦前12」。
       </div>
     </div>
 
@@ -301,8 +367,8 @@
     </div>
 
     <div class="footer-note">
-      数据来源：东方财富板块资金流 · 盘中约每 15 秒缓存刷新<br />
-      信号为涨跌幅 + 主力净额启发式标签，仅供观察，不构成投资建议
+      数据来源：东方财富板块资金流 / 指数成交额 / 涨跌停池 · 盘中约每 12–15 秒缓存<br />
+      预测量能=按连续竞价已过分钟线性外推；涨跌停已剔除 ST。信号仅供观察，不构成投资建议
     </div>
 
     </div><!-- /pageSector -->
@@ -371,7 +437,8 @@
       darkOpenCode: null,
       darkMaxAbs: 1,
       _darkLast: null,
-      trendLimit: 40,
+      trendLimit: 20,
+      _marketLast: null,
       trendHidden: {},
       _trendLast: null,
       _trendHover: null,
@@ -572,6 +639,7 @@
       renderList($("inList"), inflow, "in");
       renderList($("outList"), outflow, "out");
         refreshTrend(false);
+      refreshMarket(false);
       if (state.openCode) loadMembers(state.openCode);
     }
 
@@ -790,7 +858,7 @@
       const dpr = window.devicePixelRatio || 1;
       const rect = canvas.parentElement.getBoundingClientRect();
       const cssW = Math.max(320, rect.width || 320);
-      const cssH = Math.max(400, rect.height || 420);
+      const cssH = Math.max(480, rect.height || 500);
       canvas.width = Math.floor(cssW * dpr);
       canvas.height = Math.floor(cssH * dpr);
       canvas.style.width = cssW + "px";
@@ -800,7 +868,10 @@
       ctx.clearRect(0, 0, cssW, cssH);
 
       const seriesAll = (data && data.series) || [];
-      const series = seriesAll.filter((s) => !state.trendHidden[s.code] && (s.points || []).length);
+      const series = seriesAll
+        .filter((s) => !state.trendHidden[s.code] && (s.points || []).length)
+        .slice()
+        .sort((a, b) => Math.abs(b.main_net_yi || 0) - Math.abs(a.main_net_yi || 0));
       if (!series.length) {
         empty.style.display = "flex";
         empty.textContent = state.period !== "1"
@@ -810,7 +881,7 @@
       }
       empty.style.display = "none";
 
-      const pad = { l: 52, r: 88, t: 18, b: 32 };
+      const pad = { l: 54, r: 112, t: 16, b: 30 };
       const W = cssW - pad.l - pad.r;
       const H = cssH - pad.t - pad.b;
 
@@ -824,7 +895,7 @@
         });
       });
       if (ymin === ymax) { ymin -= 1; ymax += 1; }
-      const padY = Math.max(0.5, (ymax - ymin) * 0.08);
+      const padY = Math.max(1, (ymax - ymin) * 0.1);
       ymin -= padY; ymax += padY;
 
       const xOf = (t) => pad.l + timeToSessionX(t) * W;
@@ -839,8 +910,8 @@
       ctx.stroke();
 
       if (ymin < 0 && ymax > 0) {
-        ctx.strokeStyle = "#ccc";
-        ctx.setLineDash([4, 4]);
+        ctx.strokeStyle = "#bbb";
+        ctx.setLineDash([5, 4]);
         ctx.beginPath();
         ctx.moveTo(pad.l, yOf(0));
         ctx.lineTo(pad.l + W, yOf(0));
@@ -848,9 +919,9 @@
         ctx.setLineDash([]);
       }
 
-      ["09:30", "10:30", "11:30", "14:00", "15:00"].forEach((t) => {
+      ["09:30", "10:30", "11:30", "13:00", "14:00", "15:00"].forEach((t) => {
         const x = xOf(t);
-        ctx.strokeStyle = "#f5edd0";
+        ctx.strokeStyle = "#f3ebd2";
         ctx.beginPath();
         ctx.moveTo(x, pad.t);
         ctx.lineTo(x, pad.t + H);
@@ -861,7 +932,7 @@
         ctx.fillText(t, x, cssH - 8);
       });
 
-      const ticks = 5;
+      const ticks = 6;
       ctx.font = "11px sans-serif";
       ctx.textAlign = "right";
       for (let i = 0; i <= ticks; i++) {
@@ -873,15 +944,18 @@
         ctx.lineTo(pad.l + W, y);
         ctx.stroke();
         ctx.fillStyle = "#888";
-        ctx.fillText(v.toFixed(1), pad.l - 6, y + 3);
+        ctx.fillText(v.toFixed(0), pad.l - 6, y + 3);
       }
 
-      series.forEach((s, idx) => {
-        const color = s._color || colorForSeries(s, idx);
+      const drawOrder = series.slice().reverse();
+      drawOrder.forEach((s) => {
+        const rank = series.indexOf(s);
+        const color = s._color || colorForSeries(s, rank);
         const pts = s.points || [];
         if (pts.length < 1) return;
         ctx.strokeStyle = color;
-        ctx.lineWidth = 1.6;
+        ctx.globalAlpha = rank < 12 ? 0.95 : 0.35;
+        ctx.lineWidth = rank < 8 ? 2.1 : (rank < 14 ? 1.35 : 1.0);
         ctx.lineJoin = "round";
         ctx.beginPath();
         pts.forEach((p, i) => {
@@ -890,19 +964,62 @@
           if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
         });
         ctx.stroke();
+        ctx.globalAlpha = 1;
         const last = pts[pts.length - 1];
         const lx = xOf(last.t);
         const ly = yOf(Number(last.main_net_yi) || 0);
-        ctx.fillStyle = color;
-        ctx.beginPath();
-        ctx.arc(lx, ly, 2.4, 0, Math.PI * 2);
-        ctx.fill();
-        // only annotate strongest lines to reduce clutter
-        if (idx < 14) {
-          ctx.font = "11px sans-serif";
-          ctx.textAlign = "left";
-          ctx.fillText(s.name + " " + fmtYi(last.main_net_yi), Math.min(lx + 6, cssW - pad.r + 2), ly - 2);
+        if (rank < 14) {
+          ctx.fillStyle = color;
+          ctx.beginPath();
+          ctx.arc(lx, ly, rank < 8 ? 2.8 : 2.0, 0, Math.PI * 2);
+          ctx.fill();
         }
+      });
+
+      const labels = series.slice(0, 8).map((s, idx) => {
+        const pts = s.points || [];
+        const last = pts[pts.length - 1];
+        const ly = yOf(Number(last.main_net_yi) || 0);
+        return {
+          s,
+          idx,
+          color: s._color || colorForSeries(s, idx),
+          text: s.name + " " + fmtYi(last.main_net_yi),
+          y: ly,
+          x: Math.min(xOf(last.t) + 8, cssW - pad.r + 4),
+        };
+      });
+      labels.sort((a, b) => a.y - b.y);
+      const minGap = 14;
+      for (let i = 1; i < labels.length; i++) {
+        if (labels[i].y - labels[i - 1].y < minGap) {
+          labels[i].y = labels[i - 1].y + minGap;
+        }
+      }
+      const yMax = pad.t + H - 2;
+      for (let i = labels.length - 1; i >= 0; i--) {
+        if (labels[i].y > yMax) labels[i].y = yMax - (labels.length - 1 - i) * minGap;
+      }
+      for (let i = 1; i < labels.length; i++) {
+        if (labels[i].y - labels[i - 1].y < minGap) labels[i].y = labels[i - 1].y + minGap;
+      }
+      labels.forEach((lb) => {
+        ctx.font = "bold 11px sans-serif";
+        ctx.textAlign = "left";
+        ctx.fillStyle = lb.color;
+        const pts = lb.s.points || [];
+        const last = pts[pts.length - 1];
+        const ox = xOf(last.t);
+        const oy = yOf(Number(last.main_net_yi) || 0);
+        ctx.globalAlpha = 0.35;
+        ctx.strokeStyle = lb.color;
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(ox + 3, oy);
+        ctx.lineTo(lb.x - 2, lb.y);
+        ctx.stroke();
+        ctx.globalAlpha = 1;
+        ctx.fillText(lb.text, lb.x, lb.y + 3);
       });
 
       const hv = state._trendHover;
@@ -915,94 +1032,28 @@
         ctx.lineTo(x, pad.t + H);
         ctx.stroke();
         ctx.setLineDash([]);
-        const lines = hv.rows || [];
-        if (lines.length) {
-          const boxW = 170;
-          const boxH = 16 + lines.length * 14;
-          let bx = x + 10;
-          if (bx + boxW > cssW - 4) bx = x - boxW - 10;
-          const by = pad.t + 8;
-          ctx.fillStyle = "rgba(255,255,255,.94)";
-          ctx.strokeStyle = "#f0e6c0";
-          ctx.beginPath();
-          ctx.rect(bx, by, boxW, boxH);
-          ctx.fill();
-          ctx.stroke();
+        const rows = hv.rows || [];
+        const boxW = 168;
+        const boxH = 18 + rows.length * 15;
+        let bx = x + 10;
+        if (bx + boxW > cssW - 8) bx = x - boxW - 10;
+        let by = pad.t + 8;
+        ctx.fillStyle = "rgba(255,255,255,.94)";
+        ctx.strokeStyle = "#e0d4a8";
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.rect(bx, by, boxW, boxH);
+        ctx.fill();
+        ctx.stroke();
+        ctx.fillStyle = "#333";
+        ctx.font = "bold 11px sans-serif";
+        ctx.textAlign = "left";
+        ctx.fillText(hv.t, bx + 8, by + 14);
+        rows.forEach((r, i) => {
+          ctx.fillStyle = r.color || "#666";
           ctx.font = "11px sans-serif";
-          ctx.textAlign = "left";
-          ctx.fillStyle = "#333";
-          ctx.fillText(hv.t, bx + 8, by + 14);
-          lines.forEach((row, i) => {
-            ctx.fillStyle = row.color || "#333";
-            ctx.fillText(row.name + " " + fmtYi(row.v), bx + 8, by + 28 + i * 14);
-          });
-        }
-      }
-    }
-
-    function renderTrendLegend(series) {
-      const el = $("trendLegend");
-      if (!series || !series.length) {
-        el.innerHTML = "";
-        return;
-      }
-      el.innerHTML = series.map((s, idx) => {
-        const color = s._color || colorForSeries(s, idx);
-        const off = state.trendHidden[s.code] ? "off" : "";
-        return '<span class="lg-item ' + off + '" data-code="' + s.code + '" title="点击显隐">' +
-          '<i class="lg-dot" style="background:' + color + '"></i>' +
-          '<span>' + (s.name || "") + '</span>' +
-          '<span class="lg-val ' + toneClass(s.main_net_yi) + '">' + fmtYi(s.main_net_yi) + '</span>' +
-        '</span>';
-      }).join("");
-      el.querySelectorAll(".lg-item").forEach((node) => {
-        node.addEventListener("click", () => {
-          const code = node.getAttribute("data-code");
-          state.trendHidden[code] = !state.trendHidden[code];
-          renderTrendLegend(series);
-          paintTrendChart();
+          ctx.fillText(r.name + " " + fmtYi(r.v), bx + 8, by + 30 + i * 15);
         });
-      });
-    }
-
-    async function refreshTrend(manual = false) {
-      if (state.period !== "1") {
-        state._trendLast = { series: [] };
-        $("trendStatus").textContent = "仅今日可用";
-        $("trendHint").textContent = "切换到「今日」查看盘中轨迹";
-        $("trendEmpty").style.display = "flex";
-        $("trendEmpty").textContent = "时序图仅支持「今日」盘中累计";
-        $("trendLegend").innerHTML = "";
-        paintTrendChart();
-        return;
-      }
-      const btn = $("trendRefreshBtn");
-      if (btn) btn.disabled = true;
-      $("trendStatus").textContent = manual ? "强刷轨迹…" : "轨迹更新中…";
-      try {
-        const q = new URLSearchParams({
-          type: state.type,
-          limit: String(state.trendLimit || 40),
-          klt: "1",
-          refresh: manual ? "1" : "0",
-        });
-        const res = await fetch(API_BASE + "/api/sector/intraday?" + q.toString(), { cache: "no-store" });
-        const data = await res.json();
-        if (!data.ok) throw new Error(data.error || "轨迹接口失败");
-        (data.series || []).forEach((s, i) => { s._color = colorForSeries(s, i); });
-        state._trendLast = data;
-        const em = data.em_series || 0;
-        const n = data.count || 0;
-        $("trendStatus").textContent = (data.cached ? "轨迹缓存 · " : "轨迹已更新 · ") + n + "板";
-        $("trendHint").textContent = "主力净流入累计 · 亿元 · 东财分时" + em + "条 · " + (data.asof || "");
-        renderTrendLegend(data.series || []);
-        paintTrendChart();
-      } catch (e) {
-        $("trendStatus").textContent = "轨迹失败：" + (e.message || e);
-        $("trendEmpty").style.display = "flex";
-        $("trendEmpty").textContent = "加载失败：" + (e.message || e);
-      } finally {
-        if (btn) btn.disabled = false;
       }
     }
 
@@ -1015,8 +1066,8 @@
         if (!data || !data.series) return;
         const rect = canvas.getBoundingClientRect();
         const x = (ev.clientX - rect.left);
-        const padL = 48;
-        const padR = 72;
+        const padL = 54;
+        const padR = 112;
         const W = rect.width - padL - padR;
         const rel = Math.min(1, Math.max(0, (x - padL) / Math.max(W, 1)));
         const times = new Set();
@@ -1051,6 +1102,88 @@
     }
 
 
+    function confLabel(c) {
+      return ({ high: "高", medium: "中", low: "偏低", very_low: "很低" })[c] || "-";
+    }
+
+    function renderMarket(data) {
+      state._marketLast = data;
+      if (!data || !data.ok) {
+        $("volBody").innerHTML = '<tr><td colspan="4" style="text-align:center;color:#c0392b">量能加载失败</td></tr>';
+        return;
+      }
+      const vol = data.volume || {};
+      const sess = data.session || {};
+      const prog = sess.progress_pct != null ? sess.progress_pct + "%" : "-";
+      const conf = confLabel(vol.predict_confidence);
+      $("volMeta").textContent = "实际/预测 · 进度" + prog + " · 置信" + conf + " · 亿";
+
+      const rows = [
+        ["上海", vol.sh],
+        ["深圳", vol.sz],
+        ["北交所", vol.bj],
+        ["沪深两市", vol.hs],
+        ["沪深京合计", vol.total],
+      ];
+      $("volBody").innerHTML = rows.map(function (pair, i) {
+        const name = pair[0], x = pair[1];
+        if (!x) return "";
+        const act = x.amount_yi == null ? "-" : Number(x.amount_yi).toFixed(0);
+        const pred = x.predict_amount_yi == null ? "-" : Number(x.predict_amount_yi).toFixed(0);
+        const strong = i >= 3 ? "b" : "";
+        const chg = x.change_pct != null
+          ? ' <span class="' + toneClass(x.change_pct) + '" style="font-weight:600">' + fmtPct(x.change_pct) + "</span>"
+          : "";
+        return "<tr>"
+          + "<td>" + name + chg + "</td>"
+          + '<td class="' + strong + '">' + act + "</td>"
+          + '<td class="' + strong + '">' + pred + "</td>"
+          + "<td>" + (i === 4 ? prog : "") + "</td>"
+          + "</tr>";
+      }).join("");
+
+      const lim = data.limit || {};
+      const sum = lim.summary || {};
+      const up = sum.limit_up != null ? sum.limit_up : "-";
+      const down = sum.limit_down != null ? sum.limit_down : "-";
+      const broken = sum.broken != null ? sum.broken : "-";
+      const yizi = sum.yizi != null ? sum.yizi : "-";
+      const lb2 = sum.lb2 != null ? sum.lb2 : "-";
+      $("limUp").textContent = up;
+      $("limDown").textContent = down;
+      $("limBroken").textContent = broken;
+      $("limYizi").textContent = yizi;
+      $("limLb2").textContent = lb2;
+      const sealDen = (Number(up) || 0) + (Number(broken) || 0);
+      const seal = sealDen > 0 ? ((Number(up) || 0) / sealDen * 100).toFixed(0) + "%" : "-";
+      $("limSeal").textContent = seal;
+      $("limUpSub").textContent = sum.st_limit_up ? ("另含ST " + sum.st_limit_up) : "剔ST";
+      $("limDownSub").textContent = sum.st_limit_down ? ("另含ST " + sum.st_limit_down) : "剔ST";
+      $("limBrokenSub").textContent = "曾触及涨停";
+      $("limSealSub").textContent = "涨停/(涨停+炸板)";
+      $("limitMeta").textContent = "剔ST · " + (lim.date || "") + " · " + (data.asof || "");
+
+      const tops = [];
+      const upTop = (((lim.limit_up || {}).top) || []).slice(0, 4).map(function (x) { return x.name; }).filter(Boolean);
+      const dnTop = (((lim.limit_down || {}).top) || []).slice(0, 4).map(function (x) { return x.name; }).filter(Boolean);
+      if (upTop.length) tops.push("<b>涨停</b> " + upTop.join("、"));
+      if (dnTop.length) tops.push("<b>跌停</b> " + dnTop.join("、"));
+      $("limitTops").innerHTML = tops.join(" · ") || "暂无涨跌停明细";
+    }
+
+    async function refreshMarket(manual) {
+      try {
+        const q = new URLSearchParams({ refresh: manual ? "1" : "0" });
+        const res = await fetch(API_BASE + "/api/sector/market?" + q.toString(), { cache: "no-store" });
+        const data = await res.json();
+        if (!data.ok) throw new Error(data.error || "market failed");
+        renderMarket(data);
+      } catch (e) {
+        $("volBody").innerHTML = '<tr><td colspan="4" style="text-align:center;color:#c0392b">' + (e.message || e) + "</td></tr>";
+        $("limitMeta").textContent = "涨跌停加载失败";
+      }
+    }
+
     function setupAuto() {
       if (state.timer) clearInterval(state.timer);
       state.timer = null;
@@ -1077,6 +1210,22 @@
       refreshTrend(true);
     });
     $("trendRefreshBtn").addEventListener("click", () => refreshTrend(true));
+    const focusBtn = $("trendFocusBtn");
+    if (focusBtn) {
+      focusBtn.addEventListener("click", () => {
+        const series = (state._trendLast && state._trendLast.series) || [];
+        const ranked = series.slice().sort((a, b) => Math.abs(b.main_net_yi || 0) - Math.abs(a.main_net_yi || 0));
+        const keep = new Set(ranked.slice(0, 12).map((s) => s.code));
+        state.trendHidden = {};
+        ranked.forEach((s) => {
+          if (!keep.has(s.code)) state.trendHidden[s.code] = true;
+        });
+        renderTrendLegend(series);
+        paintTrendChart();
+        focusBtn.textContent = "已聚焦前12";
+        setTimeout(() => { focusBtn.textContent = "聚焦前12"; }, 1200);
+      });
+    }
     bindTrendCanvas();
     $("darkSortSeg").addEventListener("click", (e) => {
       const btn = e.target.closest("button[data-sort]");

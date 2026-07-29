@@ -340,6 +340,70 @@
       flex: 0 0 auto;
       min-width: 72px;
     }
+
+    /* 盘面速览：只压缩间距/字号/排布，不删字段 */
+    .overview-card { padding: 10px 12px; }
+    .overview-card .section-title { margin-bottom: 6px; }
+    .overview-card .stats { gap: 6px; }
+    .overview-card .stat-box {
+      padding: 6px 8px; border-radius: 8px;
+      display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 8px;
+    }
+    .overview-card .stat-box .k { display: inline; margin: 0; font-size: 11px; }
+    .overview-card .stat-box .v { display: inline; font-size: 13px !important; }
+    .overview-card .stat-box .s { display: inline; margin: 0; font-size: 11px; }
+    .overview-main {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 6px;
+      margin-top: 6px;
+      width: 100%;
+    }
+    @media (min-width: 720px) {
+      .overview-main { grid-template-columns: 1fr 1fr; align-items: start; }
+      .overview-main > .structure-panel { grid-column: 1 / -1; }
+    }
+    @media (min-width: 1020px) {
+      .overview-main { grid-template-columns: 1.15fr 1fr 1.05fr; }
+      .overview-main > .structure-panel { grid-column: auto; }
+      .overview-card .structure-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    }
+    .overview-card .market-panel {
+      padding: 6px 8px; border-radius: 10px; margin-top: 0 !important;
+    }
+    .overview-card .market-panel h3 {
+      margin: 0 0 4px; font-size: 12px;
+    }
+    .overview-card .market-panel h3 .subk { font-size: 10px; }
+    .overview-card .mtable { font-size: 11px; }
+    .overview-card .mtable th,
+    .overview-card .mtable td { padding: 2px 2px; }
+    .overview-card .mtable th { font-size: 10px; }
+    .overview-card .vol-vs-prev {
+      margin-top: 4px; padding: 4px 6px; font-size: 12px; border-radius: 6px;
+    }
+    .overview-card .limit-stats { gap: 4px; }
+    .overview-card .limit-box {
+      padding: 4px 4px; border-radius: 8px;
+    }
+    .overview-card .limit-box .k { font-size: 10px; margin-bottom: 0; }
+    .overview-card .limit-box .v { font-size: 15px; }
+    .overview-card .limit-box .s { font-size: 9px; min-height: 12px; margin-top: 0; }
+    .overview-card .limit-tops {
+      margin-top: 4px; font-size: 10px; line-height: 1.4;
+    }
+    .overview-card .structure-grid {
+      margin-top: 4px; gap: 4px;
+    }
+    .overview-card .structure-box {
+      padding: 4px 5px; border-radius: 8px;
+    }
+    .overview-card .structure-box .k { font-size: 10px; margin-bottom: 0; }
+    .overview-card .structure-box .v { font-size: 13px; }
+    .overview-card .structure-box .s { font-size: 9px; min-height: 0; margin-top: 0; }
+    .overview-card .structure-note {
+      margin-top: 4px; font-size: 10px; line-height: 1.35;
+    }
     .query-card .name { font-size: 18px; }
   </style>
 </head>
@@ -386,7 +450,7 @@
       <span id="asofText" class="status-pill">数据时点：-</span>
     </div>
 
-    <div class="card">
+    <div class="card overview-card">
       <div class="section-title">
         <span>📡 盘面速览</span>
         <span class="hint">板块主值=榜周期主力；结构=今日分档代理</span>
@@ -396,7 +460,7 @@
         <div class="stat-box"><span class="k">最多流出</span><span class="v" id="stBot" style="font-size:14px">-</span><span class="s" id="stBotFlow">-</span></div>
       </div>
 
-      <div class="market-grid">
+      <div class="overview-main">
         <div class="market-panel">
           <h3>
             <span>📊 沪深京量能</span>
@@ -427,9 +491,8 @@
           </div>
           <div class="limit-tops" id="limitTops">涨停/跌停个股将显示在此</div>
         </div>
-      </div>
 
-      <div class="market-panel" style="margin-top:10px">
+        <div class="market-panel structure-panel">
         <h3>
           <span>🧱 结构资金</span>
           <span class="subk" id="structMeta">主力/散户代理 · 亿元</span>
@@ -445,6 +508,7 @@
           <div class="structure-box"><span class="k">深市主力</span><span class="v" id="stSzForce">-</span><span class="s">深成分档</span></div>
         </div>
         <div class="structure-note" id="structNote">规模代理口径：不能识别国家队/公募/私募真实账户。</div>
+      </div>
       </div>
 
     </div>

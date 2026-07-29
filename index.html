@@ -159,7 +159,7 @@
       color: var(--muted); font-size: 13px; pointer-events: none;
     }
     .chart-legend {
-      display: flex; flex-wrap: wrap; gap: 6px; max-height: 132px; overflow: auto;
+      display: flex; flex-wrap: wrap; gap: 6px; max-height: 168px; overflow: auto;
       margin-top: 10px; padding-top: 4px;
     }
     .lg-item {
@@ -468,7 +468,7 @@
       </div>
       <div class="chart-legend" id="trendLegend"></div>
       <div class="chart-tip" id="trendTip">
-        「10板」= 流入TOP5+流出TOP5；「聚焦前20」= 按绝对值最大留20条。端点标签仅标前8条并做避让。点击图例可显隐。
+        「10板」= 流入TOP5+流出TOP5；「聚焦前20」= 按绝对值最大留20条。端点标签对称标注流入/流出（小板全标），并做避让。点击图例可显隐。
       </div>
     </div>
 
@@ -1093,6 +1093,41 @@
       return pal[idx % pal.length];
     }
 
+
+    function sortSeriesBalanced(series) {
+      const arr = (series || []).slice();
+      const pos = arr.filter((s) => (Number(s.main_net_yi) || 0) > 0)
+        .sort((a, b) => (Number(b.main_net_yi) || 0) - (Number(a.main_net_yi) || 0));
+      const neg = arr.filter((s) => (Number(s.main_net_yi) || 0) < 0)
+        .sort((a, b) => (Number(a.main_net_yi) || 0) - (Number(b.main_net_yi) || 0));
+      const zero = arr.filter((s) => (Number(s.main_net_yi) || 0) === 0);
+      return pos.concat(neg, zero);
+    }
+
+    /** 标签选取：小板全标；多板时对称取流入/流出，避免单边大额把另一端标签挤掉 */
+    function pickLabelSeries(series) {
+      const arr = (series || []).slice().filter((s) => (s.points || []).length);
+      if (arr.length <= 12) return arr;
+      const pos = arr.filter((s) => (Number(s.main_net_yi) || 0) > 0)
+        .sort((a, b) => (Number(b.main_net_yi) || 0) - (Number(a.main_net_yi) || 0));
+      const neg = arr.filter((s) => (Number(s.main_net_yi) || 0) < 0)
+        .sort((a, b) => (Number(a.main_net_yi) || 0) - (Number(b.main_net_yi) || 0));
+      const kIn = Math.min(5, pos.length);
+      const kOut = Math.min(5, neg.length);
+      const picked = pos.slice(0, kIn).concat(neg.slice(0, kOut));
+      if (picked.length < 10) {
+        const used = new Set(picked.map((s) => s.code));
+        const rest = arr.slice().sort((a, b) => Math.abs(Number(b.main_net_yi) || 0) - Math.abs(Number(a.main_net_yi) || 0));
+        for (const s of rest) {
+          if (used.has(s.code)) continue;
+          picked.push(s);
+          used.add(s.code);
+          if (picked.length >= 10) break;
+        }
+      }
+      return picked;
+    }
+
     function paintTrendChart() {
       const data = state._trendLast;
       const canvas = $("trendCanvas");
@@ -1219,7 +1254,7 @@
         }
       });
 
-      const labels = series.slice(0, 8).map((s, idx) => {
+      const labels = pickLabelSeries(series).map((s, idx) => {
         const pts = s.points || [];
         const last = pts[pts.length - 1];
         const ly = yOf(Number(last.main_net_yi) || 0);
@@ -1306,6 +1341,7 @@
         el.innerHTML = "";
         return;
       }
+      series = sortSeriesBalanced(series);
       el.innerHTML = series.map((s, idx) => {
         const color = s._color || colorForSeries(s, idx);
         const off = state.trendHidden[s.code] ? "off" : "";

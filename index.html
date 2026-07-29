@@ -282,6 +282,64 @@
     }
     .metric .k { color: var(--muted); font-size: 11px; }
     .metric .v { font-weight: 800; margin-top: 2px; font-variant-numeric: tabular-nums; }
+
+    /* 暗盘榜：三列密排，展开时占满整行；不影响板块双列 .list */
+    #darkList.dark-list-grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 8px;
+      align-items: start;
+    }
+    @media (min-width: 640px) {
+      #darkList.dark-list-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    }
+    @media (min-width: 900px) {
+      #darkList.dark-list-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    }
+    #darkList.dark-list-grid > .empty {
+      grid-column: 1 / -1;
+    }
+    #darkList.dark-list-grid > .row.open {
+      grid-column: 1 / -1;
+    }
+    #darkList.dark-list-grid > .row {
+      padding: 8px 10px;
+      border-radius: 10px;
+      min-width: 0;
+    }
+    #darkList.dark-list-grid > .row .name {
+      font-size: 13px;
+      display: inline-block;
+      max-width: 7.2em;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      vertical-align: middle;
+    }
+    #darkList.dark-list-grid > .row.open .name {
+      max-width: none;
+      white-space: normal;
+    }
+    #darkList.dark-list-grid > .row .code { font-size: 10px; }
+    #darkList.dark-list-grid > .row .flow { font-size: 14px; }
+    #darkList.dark-list-grid > .row .chg { font-size: 11px; }
+    #darkList.dark-list-grid > .row .rank {
+      width: 18px; height: 18px; font-size: 11px; margin-right: 4px;
+    }
+    #darkList.dark-list-grid > .row .tags { margin-top: 4px; gap: 3px; }
+    #darkList.dark-list-grid > .row .tag { font-size: 10px; padding: 1px 5px; }
+    #darkList.dark-list-grid > .row .bar-wrap { margin-top: 6px; height: 4px; }
+    #darkList.dark-list-grid > .row.open .name { font-size: 15px; }
+    #darkList.dark-list-grid > .row.open .flow { font-size: 16px; }
+    #darkList.dark-list-grid > .row.open .chg { font-size: 13px; }
+    #darkList.dark-list-grid > .row .row-top > div:first-child {
+      min-width: 0;
+      overflow: hidden;
+    }
+    #darkList.dark-list-grid > .row .right {
+      flex: 0 0 auto;
+      min-width: 72px;
+    }
     .query-card .name { font-size: 18px; }
   </style>
 </head>
@@ -473,7 +531,7 @@
           <span>📊 暗盘 / 明盘资金榜</span>
           <span class="hint" id="darkRankHint">单位：亿</span>
         </div>
-        <div class="list" id="darkList"><div class="empty">切换到本页后加载…</div></div>
+        <div class="list dark-list-grid" id="darkList"><div class="empty">切换到本页后加载…</div></div>
       </div>
 
       <div class="footer-note">
@@ -968,7 +1026,7 @@
       try {
         const q = new URLSearchParams({
           sort: state.darkSort,
-          limit: "30",
+          limit: "45",
           refresh: manual ? "1" : "0",
         });
         const res = await fetch(`${API_BASE}/api/dark/rank?${q}`, { cache: "no-store" });

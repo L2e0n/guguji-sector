@@ -458,7 +458,14 @@
               <span class="code">${item.code || ""}</span>
               <div class="tags">
                 <span class="tag ${signalClass(sig)}">${sig.label || "中性"}</span>
-                ${item.leader_name ? `<span class="tag">领涨 ${item.leader_name} ${fmtPct(item.leader_change_pct)}</span>` : ""}
+                ${(side === "out"
+                  ? (item.laggard_name
+                      ? `<span class="tag">领跌 ${item.laggard_name} ${fmtPct(item.laggard_change_pct)}</span>`
+                      : (item.leader_name ? `<span class="tag">领涨 ${item.leader_name} ${fmtPct(item.leader_change_pct)}</span>` : ""))
+                  : (item.leader_name
+                      ? `<span class="tag">领涨 ${item.leader_name} ${fmtPct(item.leader_change_pct)}</span>`
+                      : "")
+                )}
                 <span class="tag">↑${item.up_count || 0} ↓${item.down_count || 0}</span>
               </div>
             </div>

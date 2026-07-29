@@ -75,40 +75,42 @@
     .stat-box .s { display: block; margin-top: 2px; font-size: 11px; color: #999; }
 
         .chart-wrap {
-      position: relative; width: 100%; height: 500px;
+      position: relative; width: 100%; height: 300px;
       background: linear-gradient(180deg, #fffef8 0%, #fff 100%);
       border: 1px solid #f0e6c0; border-radius: 12px; overflow: hidden;
     }
     @media (min-width: 720px) {
-      .chart-wrap { height: 580px; }
+      .chart-wrap { height: 300px; }
     }
     @media (min-width: 960px) {
-      .chart-wrap { height: 640px; }
+      .chart-wrap { height: 300px; }
     }
     .market-grid {
-      display: grid; grid-template-columns: 1fr; gap: 10px; margin-top: 10px;
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 10px;
+      margin-top: 12px;
+      width: 100%;
     }
     @media (min-width: 720px) {
-      .market-grid { grid-template-columns: 1.2fr 1fr; }
+      .market-grid { grid-template-columns: 1fr 1fr; align-items: stretch; }
     }
     .market-panel {
       background: #fffaf0; border: 1px solid #ffe9a8; border-radius: 12px; padding: 10px 12px;
+      width: 100%; min-width: 0; box-sizing: border-box;
     }
     .market-panel h3 {
       margin: 0 0 8px; font-size: 13px; color: var(--secondary);
       display:flex; justify-content:space-between; gap:8px; align-items:center;
     }
     .market-panel h3 .subk { font-size: 11px; color: var(--muted); font-weight: 500; }
-    .mtable { width: 100%; border-collapse: collapse; font-size: 12px; }
+    .mtable { width: 100%; border-collapse: collapse; font-size: 12px; table-layout: fixed; }
     .mtable th, .mtable td { padding: 4px 2px; text-align: right; font-variant-numeric: tabular-nums; }
     .mtable th:first-child, .mtable td:first-child { text-align: left; }
     .mtable th { color: var(--muted); font-weight: 600; font-size: 11px; }
     .mtable td.b { font-weight: 800; }
     .limit-stats {
       display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 6px;
-    }
-    @media (min-width: 520px) {
-      .limit-stats { grid-template-columns: repeat(6, minmax(0,1fr)); }
     }
     .limit-box {
       background: #fff; border: 1px solid #f0e6c0; border-radius: 10px; padding: 8px 6px; text-align: center;
@@ -289,7 +291,7 @@
         <div class="stat-box"><span class="k">净流出板块</span><span class="v" id="stOut">-</span><span class="s">家</span></div>
         <div class="stat-box"><span class="k">列表净额</span><span class="v" id="stNet">-</span><span class="s">亿</span></div>
         <div class="stat-box"><span class="k">最强吸金</span><span class="v" id="stTop" style="font-size:14px">-</span><span class="s" id="stTopFlow">-</span></div>
-      
+      </div>
 
       <div class="market-grid">
         <div class="market-panel">
@@ -321,7 +323,8 @@
           </div>
           <div class="limit-tops" id="limitTops">涨停/跌停个股将显示在此</div>
         </div>
-      </div></div>
+      </div>
+
     </div>
 
     <div class="card" id="trendCard">
@@ -858,7 +861,7 @@
       const dpr = window.devicePixelRatio || 1;
       const rect = canvas.parentElement.getBoundingClientRect();
       const cssW = Math.max(320, rect.width || 320);
-      const cssH = Math.max(480, rect.height || 500);
+      const cssH = Math.max(260, rect.height || 300);
       canvas.width = Math.floor(cssW * dpr);
       canvas.height = Math.floor(cssH * dpr);
       canvas.style.width = cssW + "px";

@@ -133,6 +133,41 @@
     .empty { text-align: center; color: var(--muted); padding: 28px 10px; font-size: 13px; }
     .footer-note { text-align: center; color: #aaa; font-size: 11px; margin-top: 8px; line-height: 1.6; }
     .auto-on { color: #206c39; font-weight: 700; }
+
+    .page-tabs {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 12px;
+    }
+    .page-tab {
+      border: 1px solid var(--border); background: #fff; border-radius: 14px;
+      padding: 12px 10px; cursor: pointer; text-align: center; font-weight: 800;
+      color: var(--secondary); box-shadow: 0 4px 12px rgba(251,192,45,.08);
+    }
+    .page-tab small { display: block; margin-top: 4px; font-weight: 500; color: var(--muted); font-size: 11px; }
+    .page-tab.active {
+      background: linear-gradient(180deg, #fff8d6, #ffe58a);
+      border-color: #f0c000;
+    }
+    .hidden { display: none !important; }
+    .search-row {
+      display: flex; gap: 8px; flex-wrap: wrap; align-items: center; width: 100%;
+    }
+    .search-row input {
+      flex: 1 1 180px; min-width: 140px; border: 1px solid #eee; border-radius: 10px;
+      padding: 9px 12px; font-size: 14px; outline: none; background: #fff;
+    }
+    .search-row input:focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(251,192,45,.18); }
+    .dark-metrics {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: 8px; font-size: 12px;
+    }
+    @media (min-width: 640px) {
+      .dark-metrics { grid-template-columns: repeat(4, 1fr); }
+    }
+    .metric {
+      background: #fafafa; border: 1px solid #f0f0f0; border-radius: 10px; padding: 8px;
+    }
+    .metric .k { color: var(--muted); font-size: 11px; }
+    .metric .v { font-weight: 800; margin-top: 2px; font-variant-numeric: tabular-nums; }
+    .query-card .name { font-size: 18px; }
   </style>
 </head>
 <body>
@@ -140,12 +175,25 @@
     <div class="header">
       <a class="home-link" href="https://guguji.icu" title="返回主页">← 返回主页</a>
       <h1>🐔 板块流向</h1>
-      <div class="sub">
+      <div class="sub" id="pageSub">
         实时识别 A 股行业 / 概念板块主力资金流向（东财口径）。盘中自动刷新，点击板块可下钻成分股。
       </div>
     </div>
 
-    <div class="card toolbar">
+
+    <div class="page-tabs" id="pageTabs">
+      <button type="button" class="page-tab active" data-page="sector">
+        📡 板块流向
+        <small>东财行业/概念/地区</small>
+      </button>
+      <button type="button" class="page-tab" data-page="dark">
+        🕵️ 暗盘资金
+        <small>问财暗盘 / 明盘 / DDE</small>
+      </button>
+    </div>
+
+    <div id="pageSector">
+      <div class="card toolbar">
       <div class="seg" id="typeSeg">
         <button type="button" class="btn active" data-type="industry">行业</button>
         <button type="button" class="btn secondary" data-type="concept">概念</button>
@@ -199,6 +247,51 @@
       数据来源：东方财富板块资金流 · 盘中约每 15 秒缓存刷新<br />
       信号为涨跌幅 + 主力净额启发式标签，仅供观察，不构成投资建议
     </div>
+
+    </div><!-- /pageSector -->
+
+    <div id="pageDark" class="hidden">
+      <div class="card toolbar">
+        <div class="seg" id="darkSortSeg">
+          <button type="button" class="btn active" data-sort="dark_in">暗盘流入</button>
+          <button type="button" class="btn secondary" data-sort="dark_out">暗盘流出</button>
+          <button type="button" class="btn secondary" data-sort="light_in">明盘流入</button>
+          <button type="button" class="btn secondary" data-sort="light_out">明盘流出</button>
+        </div>
+        <button id="darkRefreshBtn" class="btn" type="button">刷新榜单</button>
+      </div>
+
+      <div class="card">
+        <div class="section-title">
+          <span>🔎 个股查询</span>
+          <span class="hint">名称 / 代码，如 贵州茅台、600519</span>
+        </div>
+        <div class="search-row">
+          <input id="darkQueryInput" type="search" placeholder="输入股票名称或代码" autocomplete="off" />
+          <button id="darkQueryBtn" class="btn" type="button">查询</button>
+        </div>
+        <div id="darkQueryResult" class="query-card" style="margin-top:12px"></div>
+      </div>
+
+      <div class="meta-row">
+        <span id="darkStatusText" class="status-pill">准备就绪</span>
+        <span id="darkAsofText" class="status-pill">数据时点：-</span>
+      </div>
+
+      <div class="card">
+        <div class="section-title">
+          <span>📊 暗盘 / 明盘资金榜</span>
+          <span class="hint" id="darkRankHint">单位：亿</span>
+        </div>
+        <div class="list" id="darkList"><div class="empty">切换到本页后加载…</div></div>
+      </div>
+
+      <div class="footer-note">
+        数据来源：同花顺问财 OpenAPI（hithink-market-query）· 暗盘为日级累计盘中刷新<br />
+        明盘口径取问财「主力资金流向」字段 · DDX/DDY/DDZ 为 DDE 决策指标 · 仅供观察
+      </div>
+    </div>
+
   </div>
 
   <script>
@@ -241,6 +334,35 @@
     }
     function periodLabel(p) {
       return p === "5" ? "5日" : p === "10" ? "10日" : "今日";
+    }
+
+    function fmtNum(v, digits = 3) {
+      if (v == null || Number.isNaN(v)) return "-";
+      return Number(v).toFixed(digits);
+    }
+    function darkSortLabel(s) {
+      return ({
+        dark_in: "暗盘流入",
+        dark_out: "暗盘流出",
+        light_in: "明盘流入",
+        light_out: "明盘流出",
+      })[s] || s;
+    }
+    function setPage(page) {
+      state.page = page;
+      $("pageSector").classList.toggle("hidden", page !== "sector");
+      $("pageDark").classList.toggle("hidden", page !== "dark");
+      document.querySelectorAll("#pageTabs .page-tab").forEach((btn) => {
+        btn.classList.toggle("active", btn.getAttribute("data-page") === page);
+      });
+      if (page === "sector") {
+        $("pageSub").textContent = "实时识别 A 股行业 / 概念板块主力资金流向（东财口径）。盘中自动刷新，点击板块可下钻成分股。";
+        document.title = "板块流向 · 咕咕鸡";
+      } else {
+        $("pageSub").textContent = "同花顺问财暗盘 / 明盘主力资金与 DDE（DDX/DDY/DDZ）。支持榜单与个股查询。";
+        document.title = "暗盘资金 · 咕咕鸡";
+        if (!state.darkLoaded) refreshDark(true);
+      }
     }
 
     function setActiveSeg(rootId, attr, value) {
@@ -408,6 +530,156 @@
       }
     }
 
+
+    function darkRowHtml(item, rank) {
+      const dark = item.dark_net_yi;
+      const light = item.light_net_yi;
+      const chg = item.change_pct;
+      const hot = rank <= 3;
+      const open = state.darkOpenCode === item.code;
+      const primary = (state.darkSort.startsWith("light") ? light : dark);
+      const w = barWidth(primary, state.darkMaxAbs);
+      const sig = item.signal || {};
+      return `
+        <div class="row ${open ? "open" : ""}" data-code="${item.code}">
+          <div class="row-top">
+            <div>
+              <span class="rank ${hot ? "hot" : ""}">${rank}</span>
+              <span class="name">${item.name || "-"}</span>
+              <span class="code">${item.code || ""}</span>
+              <div class="tags">
+                <span class="tag ${signalClass(sig)}">${sig.label || "中性"}</span>
+                <span class="tag">DDX ${fmtNum(item.ddx, 2)}</span>
+                <span class="tag">增仓 ${fmtPct(item.add_ratio)}</span>
+              </div>
+            </div>
+            <div class="right">
+              <div class="flow ${toneClass(dark)}">暗 ${fmtYi(dark)}亿</div>
+              <div class="chg ${toneClass(light)}">明 ${fmtYi(light)}亿</div>
+              <div class="chg ${toneClass(chg)}">${fmtPct(chg)}</div>
+            </div>
+          </div>
+          <div class="bar-wrap"><div class="bar ${(primary || 0) >= 0 ? "in" : "out"}" style="width:${w}%"></div></div>
+          <div class="detail" ${open ? "" : "hidden"}>
+            <div class="dark-metrics">
+              <div class="metric"><div class="k">最新价</div><div class="v">${item.price == null ? "-" : item.price}</div></div>
+              <div class="metric"><div class="k">涨跌幅</div><div class="v ${toneClass(chg)}">${fmtPct(chg)}</div></div>
+              <div class="metric"><div class="k">主力暗盘</div><div class="v ${toneClass(dark)}">${fmtYi(dark)} 亿</div></div>
+              <div class="metric"><div class="k">主力明盘</div><div class="v ${toneClass(light)}">${fmtYi(light)} 亿</div></div>
+              <div class="metric"><div class="k">DDX 大单动向</div><div class="v ${toneClass(item.ddx)}">${fmtNum(item.ddx, 3)}</div></div>
+              <div class="metric"><div class="k">DDY 涨跌动因</div><div class="v ${toneClass(item.ddy)}">${fmtNum(item.ddy, 3)}</div></div>
+              <div class="metric"><div class="k">DDZ 大单力度</div><div class="v ${toneClass(item.ddz)}">${fmtNum(item.ddz, 3)}</div></div>
+              <div class="metric"><div class="k">主力增仓占比</div><div class="v ${toneClass(item.add_ratio)}">${fmtPct(item.add_ratio)}</div></div>
+            </div>
+          </div>
+        </div>`;
+    }
+
+    function renderDarkQuery(item) {
+      const box = $("darkQueryResult");
+      if (!item) {
+        box.innerHTML = '<div class="empty">未查到该股票的暗盘数据</div>';
+        return;
+      }
+      const sig = item.signal || {};
+      box.innerHTML = `
+        <div class="row open" style="cursor:default">
+          <div class="row-top">
+            <div>
+              <span class="name">${item.name || "-"}</span>
+              <span class="code">${item.code || ""}</span>
+              <div class="tags"><span class="tag ${signalClass(sig)}">${sig.label || "中性"}</span></div>
+            </div>
+            <div class="right">
+              <div class="flow ${toneClass(item.dark_net_yi)}">暗 ${fmtYi(item.dark_net_yi)}亿</div>
+              <div class="chg ${toneClass(item.light_net_yi)}">明 ${fmtYi(item.light_net_yi)}亿</div>
+            </div>
+          </div>
+          <div class="detail">
+            <div class="dark-metrics">
+              <div class="metric"><div class="k">最新价</div><div class="v">${item.price == null ? "-" : item.price}</div></div>
+              <div class="metric"><div class="k">涨跌幅</div><div class="v ${toneClass(item.change_pct)}">${fmtPct(item.change_pct)}</div></div>
+              <div class="metric"><div class="k">主力暗盘资金</div><div class="v ${toneClass(item.dark_net_yi)}">${fmtYi(item.dark_net_yi)} 亿</div></div>
+              <div class="metric"><div class="k">主力明盘资金</div><div class="v ${toneClass(item.light_net_yi)}">${fmtYi(item.light_net_yi)} 亿</div></div>
+              <div class="metric"><div class="k">DDX</div><div class="v ${toneClass(item.ddx)}">${fmtNum(item.ddx, 3)}</div></div>
+              <div class="metric"><div class="k">DDY</div><div class="v ${toneClass(item.ddy)}">${fmtNum(item.ddy, 3)}</div></div>
+              <div class="metric"><div class="k">DDZ</div><div class="v ${toneClass(item.ddz)}">${fmtNum(item.ddz, 3)}</div></div>
+              <div class="metric"><div class="k">主力增仓占比</div><div class="v ${toneClass(item.add_ratio)}">${fmtPct(item.add_ratio)}</div></div>
+            </div>
+          </div>
+        </div>`;
+    }
+
+    function renderDarkList(items) {
+      const el = $("darkList");
+      if (!items || !items.length) {
+        el.innerHTML = '<div class="empty">暂无数据</div>';
+        return;
+      }
+      state.darkMaxAbs = Math.max(0.01, ...items.map((x) => {
+        const v = state.darkSort.startsWith("light") ? x.light_net_yi : x.dark_net_yi;
+        return Math.abs(v || 0);
+      }));
+      el.innerHTML = items.map((it, i) => darkRowHtml(it, i + 1)).join("");
+      el.querySelectorAll(".row").forEach((node) => {
+        node.addEventListener("click", () => {
+          const code = node.getAttribute("data-code");
+          state.darkOpenCode = state.darkOpenCode === code ? null : code;
+          renderDarkList(state._darkLast?.items || items);
+        });
+      });
+    }
+
+    async function refreshDark(manual = false) {
+      const btn = $("darkRefreshBtn");
+      btn.disabled = true;
+      $("darkStatusText").textContent = manual ? "榜单刷新中…" : "加载榜单…";
+      try {
+        const q = new URLSearchParams({
+          sort: state.darkSort,
+          limit: "30",
+          refresh: manual ? "1" : "0",
+        });
+        const res = await fetch(`${API_BASE}/api/dark/rank?${q}`, { cache: "no-store" });
+        const data = await res.json();
+        if (!data.ok) throw new Error(data.error || "接口失败");
+        state._darkLast = data;
+        state.darkLoaded = true;
+        $("darkRankHint").textContent = `${darkSortLabel(state.darkSort)} · 共 ${data.count || data.returned || 0} 只 · 单位亿`;
+        $("darkAsofText").textContent = `数据时点：${data.asof_day || data.asof || "-"}`;
+        $("darkStatusText").textContent = data.cached ? "已更新（缓存）" : "已更新";
+        renderDarkList(data.items || []);
+      } catch (e) {
+        $("darkStatusText").textContent = `失败：${e.message || e}`;
+        $("darkList").innerHTML = `<div class="empty">加载失败：${e.message || e}</div>`;
+      } finally {
+        btn.disabled = false;
+      }
+    }
+
+    async function queryDark() {
+      const q = ($("darkQueryInput").value || "").trim();
+      if (!q) {
+        $("darkQueryResult").innerHTML = '<div class="empty">请输入股票名称或代码</div>';
+        return;
+      }
+      $("darkQueryBtn").disabled = true;
+      $("darkQueryResult").innerHTML = '<div class="empty">查询中…</div>';
+      try {
+        const res = await fetch(`${API_BASE}/api/dark/query?q=${encodeURIComponent(q)}`, { cache: "no-store" });
+        const data = await res.json();
+        if (!data.ok) throw new Error(data.error || "查询失败");
+        renderDarkQuery(data.item);
+        if (data.asof || data.asof_day) {
+          $("darkAsofText").textContent = `数据时点：${data.asof_day || data.asof}`;
+        }
+      } catch (e) {
+        $("darkQueryResult").innerHTML = `<div class="empty">查询失败：${e.message || e}</div>`;
+      } finally {
+        $("darkQueryBtn").disabled = false;
+      }
+    }
+
     function setupAuto() {
       if (state.timer) clearInterval(state.timer);
       state.timer = null;
@@ -415,9 +687,29 @@
       $("autoBtn").classList.toggle("active", state.auto);
       $("autoBtn").classList.toggle("secondary", !state.auto);
       if (state.auto) {
-        state.timer = setInterval(() => refresh(false), 30000);
+        state.timer = setInterval(() => { if (state.page === "sector") refresh(false); }, 30000);
       }
     }
+
+
+    $("pageTabs").addEventListener("click", (e) => {
+      const btn = e.target.closest("button[data-page]");
+      if (!btn) return;
+      setPage(btn.getAttribute("data-page"));
+    });
+    $("darkSortSeg").addEventListener("click", (e) => {
+      const btn = e.target.closest("button[data-sort]");
+      if (!btn) return;
+      state.darkSort = btn.getAttribute("data-sort");
+      state.darkOpenCode = null;
+      setActiveSeg("darkSortSeg", "data-sort", state.darkSort);
+      refreshDark(true);
+    });
+    $("darkRefreshBtn").addEventListener("click", () => refreshDark(true));
+    $("darkQueryBtn").addEventListener("click", () => queryDark());
+    $("darkQueryInput").addEventListener("keydown", (e) => {
+      if (e.key === "Enter") queryDark();
+    });
 
     $("typeSeg").addEventListener("click", (e) => {
       const btn = e.target.closest("button[data-type]");
@@ -445,6 +737,8 @@
         : "自动刷新已关闭";
     });
 
+    const tab = new URLSearchParams(location.search).get("tab");
+    if (tab === "dark") setPage("dark");
     setupAuto();
     refresh(true);
   </script>

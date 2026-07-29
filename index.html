@@ -206,6 +206,20 @@
     .down { color: var(--down); }
     .muted { color: var(--muted); }
     .bar-wrap { margin-top: 8px; height: 6px; background: #f2f2f2; border-radius: 99px; overflow: hidden; }
+    .struct-line {
+      display: flex; flex-wrap: wrap; gap: 6px 10px; margin-top: 6px;
+      font-size: 11px; font-variant-numeric: tabular-nums; color: #666;
+    }
+    .struct-line .si { white-space: nowrap; }
+    .struct-line .si b { font-weight: 800; margin-left: 2px; }
+    .struct-mini {
+      margin-top: 6px; height: 5px; border-radius: 99px; overflow: hidden;
+      display: flex; background: #f2f2f2;
+    }
+    .struct-mini span { display: block; height: 100%; min-width: 0; }
+    .struct-mini .f { background: linear-gradient(90deg, #ffb4b4, #e74c3c); }
+    .struct-mini .r { background: linear-gradient(90deg, #a8e6c1, #27ae60); }
+    .struct-mini .m { background: #dfe6e9; }
     .bar { height: 100%; border-radius: 99px; }
     .bar.in { background: linear-gradient(90deg, #ffb4b4, #e74c3c); }
     .bar.out { background: linear-gradient(90deg, #a8e6c1, #27ae60); }
@@ -317,7 +331,7 @@
     <div class="card">
       <div class="section-title">
         <span>📡 盘面速览</span>
-        <span class="hint">基于当前列表 Top 口径</span>
+        <span class="hint">板块主值=榜周期主力；结构=今日分档代理</span>
       </div>
       <div class="stats" id="stats">
         <div class="stat-box"><span class="k">最强吸金</span><span class="v" id="stTop" style="font-size:14px">-</span><span class="s" id="stTopFlow">-</span></div>
@@ -405,14 +419,14 @@
     <div class="cols">
       <div class="card">
         <div class="section-title">
-          <span>🔥 主力净流入 Top</span>
+          <span>🔥 净流入 Top · 结构</span>
           <span class="hint" id="inHint">今日 · 单位亿</span>
         </div>
         <div class="list" id="inList"><div class="empty">加载中…</div></div>
       </div>
       <div class="card">
         <div class="section-title">
-          <span>💧 主力净流出 Top</span>
+          <span>💧 净流出 Top · 结构</span>
           <span class="hint" id="outHint">今日 · 单位亿</span>
         </div>
         <div class="list" id="outList"><div class="empty">加载中…</div></div>
@@ -576,6 +590,45 @@
       return pct;
     }
 
+    function boardForceYi(item) {
+      if (item.force_net_yi != null) return Number(item.force_net_yi);
+      const a = item.super_net_yi, b = item.large_net_yi;
+      if (a == null && b == null) return item.today_main_net_yi != null ? Number(item.today_main_net_yi) : null;
+      return Number(a || 0) + Number(b || 0);
+    }
+    function boardRetailYi(item) {
+      if (item.retail_net_yi != null) return Number(item.retail_net_yi);
+      return item.small_net_yi == null ? null : Number(item.small_net_yi);
+    }
+    function boardScissorsYi(item) {
+      if (item.scissors_yi != null) return Number(item.scissors_yi);
+      const f = boardForceYi(item), r = boardRetailYi(item);
+      if (f == null || r == null) return null;
+      return f - r;
+    }
+    function boardSharePct(item) {
+      if (item.size_main_share_pct != null) return Number(item.size_main_share_pct);
+      const s = Math.abs(Number(item.super_net_yi) || 0);
+      const l = Math.abs(Number(item.large_net_yi) || 0);
+      const m = Math.abs(Number(item.mid_net_yi) || 0);
+      const r = Math.abs(Number(item.small_net_yi) || 0);
+      const t = s + l + m + r;
+      return t > 0 ? (s + l) / t * 100 : null;
+    }
+    function structMiniBar(item) {
+      const f = Math.abs(boardForceYi(item) || 0);
+      const r = Math.abs(boardRetailYi(item) || 0);
+      const m = Math.abs(Number(item.mid_net_yi) || 0);
+      const t = f + r + m;
+      if (t <= 0) return "";
+      const pf = (f / t * 100).toFixed(1);
+      const pr = (r / t * 100).toFixed(1);
+      const pm = Math.max(0, 100 - Number(pf) - Number(pr)).toFixed(1);
+      return `<div class="struct-mini" title="红=主力体量 绿=散户体量 灰=中单体量(绝对值)">`
+        + `<span class="f" style="width:${pf}%"></span>`
+        + `<span class="r" style="width:${pr}%"></span>`
+        + `<span class="m" style="width:${pm}%"></span></div>`;
+    }
     function rowHtml(item, rank, side) {
       const yi = item.main_net_yi;
       const chg = item.change_pct;
@@ -583,6 +636,10 @@
       const open = state.openCode === item.code;
       const w = barWidth(yi, state.maxAbs);
       const sig = item.signal || {};
+      const forceYi = boardForceYi(item);
+      const retailYi = boardRetailYi(item);
+      const scissorsYi = boardScissorsYi(item);
+      const share = boardSharePct(item);
       return `
         <div class="row ${open ? "open" : ""}" data-code="${item.code}" data-side="${side}">
           <div class="row-top">
@@ -609,17 +666,29 @@
             </div>
           </div>
           <div class="bar-wrap"><div class="bar ${yi >= 0 ? "in" : "out"}" style="width:${w}%"></div></div>
+          <div class="struct-line">
+            <span class="si">主力<b class="${toneClass(forceYi)}">${fmtYiSigned(forceYi, 1)}</b></span>
+            <span class="si">散户<b class="${toneClass(retailYi)}">${fmtYiSigned(retailYi, 1)}</b></span>
+            <span class="si">剪刀差<b class="${toneClass(scissorsYi)}">${fmtYiSigned(scissorsYi, 1)}</b></span>
+            <span class="si">大占比<b>${share == null ? "-" : share.toFixed(0) + "%"}</b></span>
+          </div>
+          ${structMiniBar(item)}
           <div class="detail" ${open ? "" : "hidden"}>
             <div class="grid2">
+              <div class="kv"><span>主力(超大+大)</span><b class="${toneClass(forceYi)}">${fmtYiSigned(forceYi, 2)}亿</b></div>
+              <div class="kv"><span>散户(小单)</span><b class="${toneClass(retailYi)}">${fmtYiSigned(retailYi, 2)}亿</b></div>
+              <div class="kv"><span>剪刀差</span><b class="${toneClass(scissorsYi)}">${fmtYiSigned(scissorsYi, 2)}亿</b></div>
+              <div class="kv"><span>大单体量占比</span><b>${share == null ? "-" : share.toFixed(1) + "%"}</b></div>
               <div class="kv"><span>超大单</span><b class="${toneClass(item.super_net_yi)}">${fmtYi(item.super_net_yi)}亿</b></div>
               <div class="kv"><span>大单</span><b class="${toneClass(item.large_net_yi)}">${fmtYi(item.large_net_yi)}亿</b></div>
               <div class="kv"><span>中单</span><b class="${toneClass(item.mid_net_yi)}">${fmtYi(item.mid_net_yi)}亿</b></div>
               <div class="kv"><span>小单</span><b class="${toneClass(item.small_net_yi)}">${fmtYi(item.small_net_yi)}亿</b></div>
               <div class="kv"><span>今日主力</span><b class="${toneClass(item.today_main_net_yi)}">${fmtYi(item.today_main_net_yi)}亿</b></div>
-              <div class="kv"><span>主力占比</span><b>${item.today_main_ratio == null ? "-" : item.today_main_ratio.toFixed(2) + "%"}</b></div>
+              <div class="kv"><span>主力净比</span><b>${item.today_main_ratio == null ? "-" : item.today_main_ratio.toFixed(2) + "%"}</b></div>
               <div class="kv"><span>5日主力</span><b class="${toneClass(item.day5_main_net_yi)}">${fmtYi(item.day5_main_net_yi)}亿</b></div>
               <div class="kv"><span>10日主力</span><b class="${toneClass(item.day10_main_net_yi)}">${fmtYi(item.day10_main_net_yi)}亿</b></div>
             </div>
+            <div class="structure-note" style="margin:8px 0 0">结构为今日分档代理；右侧主值为当前榜周期主力净流入。</div>
             <div class="members" id="m-${item.code}"><div class="empty">展开加载成分股…</div></div>
           </div>
         </div>`;

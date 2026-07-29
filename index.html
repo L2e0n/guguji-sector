@@ -308,6 +308,12 @@
       maxAbs: 1,
       openCode: null,
       membersCache: {},
+      page: "sector",
+      darkSort: "dark_in",
+      darkLoaded: false,
+      darkOpenCode: null,
+      darkMaxAbs: 1,
+      _darkLast: null,
     };
 
     const $ = (id) => document.getElementById(id);
@@ -341,12 +347,13 @@
       return Number(v).toFixed(digits);
     }
     function darkSortLabel(s) {
+      const key = s || "dark_in";
       return ({
         dark_in: "暗盘流入",
         dark_out: "暗盘流出",
         light_in: "明盘流入",
         light_out: "明盘流出",
-      })[s] || s;
+      })[key] || key;
     }
     function setPage(page) {
       state.page = page;
@@ -537,7 +544,7 @@
       const chg = item.change_pct;
       const hot = rank <= 3;
       const open = state.darkOpenCode === item.code;
-      const primary = (state.darkSort.startsWith("light") ? light : dark);
+      const primary = ((state.darkSort || "dark_in").startsWith("light") ? light : dark);
       const w = barWidth(primary, state.darkMaxAbs);
       const sig = item.signal || {};
       return `
@@ -617,7 +624,7 @@
         return;
       }
       state.darkMaxAbs = Math.max(0.01, ...items.map((x) => {
-        const v = state.darkSort.startsWith("light") ? x.light_net_yi : x.dark_net_yi;
+        const v = (state.darkSort || "dark_in").startsWith("light") ? x.light_net_yi : x.dark_net_yi;
         return Math.abs(v || 0);
       }));
       el.innerHTML = items.map((it, i) => darkRowHtml(it, i + 1)).join("");

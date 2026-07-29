@@ -412,6 +412,21 @@
       margin-top: auto; padding-top: 6px; font-size: 11px; line-height: 1.4;
       flex: 0 0 auto;
     }
+
+    .overview-card .vol-panel { padding: 12px 12px; }
+    .overview-card .vol-panel h3 { margin: 0 0 10px; }
+    .overview-card .vol-panel .mtable { font-size: 14px; line-height: 1.45; width: 100%; }
+    .overview-card .vol-panel .mtable th,
+    .overview-card .vol-panel .mtable td {
+      padding: 7px 6px;
+      vertical-align: middle;
+    }
+    .overview-card .vol-panel .mtable th { font-size: 12px; padding-bottom: 8px; }
+    .overview-card .vol-panel .mtable td.b { font-size: 15px; letter-spacing: 0.2px; }
+    .overview-card .vol-panel .mtable tbody tr + tr td { border-top: 1px solid #f5edd0; }
+    .overview-card .vol-panel .vol-vs-prev {
+      margin-top: auto; padding: 8px 10px; font-size: 13px;
+    }
     .overview-card .section-title { font-size: 15px; }
     .overview-card .section-title .hint { font-size: 12px; }
     .query-card .name { font-size: 18px; }
@@ -471,7 +486,7 @@
       </div>
 
       <div class="overview-main">
-        <div class="market-panel">
+        <div class="market-panel vol-panel">
           <h3>
             <span>📊 沪深京量能</span>
             <span class="subk" id="volMeta">进度 · 亿元</span>

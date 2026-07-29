@@ -456,11 +456,9 @@
       </div>
       <div class="chart-toolbar">
         <div class="seg" id="trendLimitSeg">
-          <button type="button" class="btn active" data-limit="20">20板</button>
-          <button type="button" class="btn secondary" data-limit="40">40板</button>
-          <button type="button" class="btn secondary" data-limit="60">60板</button>
+          <button type="button" class="btn active" data-limit="10">10板</button>
+          <button type="button" class="btn secondary" data-limit="20">聚焦前20</button>
         </div>
-        <button id="trendFocusBtn" class="btn secondary" type="button" title="仅显示绝对值最大的前12条">聚焦前12</button>
         <button id="trendRefreshBtn" class="btn secondary" type="button">刷新轨迹</button>
         <span class="status-pill" id="trendStatus">轨迹待命</span>
       </div>
@@ -470,7 +468,7 @@
       </div>
       <div class="chart-legend" id="trendLegend"></div>
       <div class="chart-tip" id="trendTip">
-        默认展示绝对值最大 20 板；端点标签仅标前 8 条并做避让。优先东财分时主力，叠加服务端快照。点击图例可显隐；可用「聚焦前12」。
+        「10板」= 流入TOP5+流出TOP5；「聚焦前20」= 按绝对值最大留20条。端点标签仅标前8条并做避让。点击图例可显隐。
       </div>
     </div>
 
@@ -562,7 +560,7 @@
       darkOpenCode: null,
       darkMaxAbs: 1,
       _darkLast: null,
-      trendLimit: 20,
+      trendLimit: 10,
       _marketLast: null,
       trendHidden: {},
       _trendLast: null,
@@ -1604,22 +1602,6 @@
       refreshTrend(true);
     });
     $("trendRefreshBtn").addEventListener("click", () => refreshTrend(true));
-    const focusBtn = $("trendFocusBtn");
-    if (focusBtn) {
-      focusBtn.addEventListener("click", () => {
-        const series = (state._trendLast && state._trendLast.series) || [];
-        const ranked = series.slice().sort((a, b) => Math.abs(b.main_net_yi || 0) - Math.abs(a.main_net_yi || 0));
-        const keep = new Set(ranked.slice(0, 12).map((s) => s.code));
-        state.trendHidden = {};
-        ranked.forEach((s) => {
-          if (!keep.has(s.code)) state.trendHidden[s.code] = true;
-        });
-        renderTrendLegend(series);
-        paintTrendChart();
-        focusBtn.textContent = "已聚焦前12";
-        setTimeout(() => { focusBtn.textContent = "聚焦前12"; }, 1200);
-      });
-    }
     bindTrendCanvas();
     $("darkSortSeg").addEventListener("click", (e) => {
       const btn = e.target.closest("button[data-sort]");

@@ -355,12 +355,13 @@
     .overview-main {
       display: grid;
       grid-template-columns: 1fr;
-      gap: 6px;
-      margin-top: 6px;
+      gap: 8px;
+      margin-top: 8px;
       width: 100%;
+      align-items: stretch;
     }
     @media (min-width: 720px) {
-      .overview-main { grid-template-columns: 1fr 1fr; align-items: start; }
+      .overview-main { grid-template-columns: 1fr 1fr; }
       .overview-main > .structure-panel { grid-column: 1 / -1; }
     }
     @media (min-width: 1020px) {
@@ -369,40 +370,46 @@
       .overview-card .structure-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     }
     .overview-card .market-panel {
-      padding: 6px 8px; border-radius: 10px; margin-top: 0 !important;
+      padding: 10px 10px; border-radius: 10px; margin-top: 0 !important;
+      display: flex; flex-direction: column; height: 100%; min-height: 0;
+      box-sizing: border-box;
     }
     .overview-card .market-panel h3 {
-      margin: 0 0 4px; font-size: 12px;
+      margin: 0 0 8px; font-size: 12px; flex: 0 0 auto;
     }
     .overview-card .market-panel h3 .subk { font-size: 10px; }
-    .overview-card .mtable { font-size: 11px; }
+    .overview-card .mtable { font-size: 11px; flex: 0 0 auto; }
     .overview-card .mtable th,
-    .overview-card .mtable td { padding: 2px 2px; }
+    .overview-card .mtable td { padding: 3px 2px; }
     .overview-card .mtable th { font-size: 10px; }
     .overview-card .vol-vs-prev {
-      margin-top: 4px; padding: 4px 6px; font-size: 12px; border-radius: 6px;
+      margin-top: auto; padding: 6px 8px; font-size: 12px; border-radius: 6px;
     }
-    .overview-card .limit-stats { gap: 4px; }
+    .overview-card .limit-stats { gap: 6px; flex: 0 0 auto; }
     .overview-card .limit-box {
-      padding: 4px 4px; border-radius: 8px;
+      padding: 6px 5px; border-radius: 8px;
     }
-    .overview-card .limit-box .k { font-size: 10px; margin-bottom: 0; }
+    .overview-card .limit-box .k { font-size: 10px; margin-bottom: 1px; }
     .overview-card .limit-box .v { font-size: 15px; }
-    .overview-card .limit-box .s { font-size: 9px; min-height: 12px; margin-top: 0; }
+    .overview-card .limit-box .s { font-size: 9px; min-height: 12px; margin-top: 1px; }
     .overview-card .limit-tops {
-      margin-top: 4px; font-size: 10px; line-height: 1.4;
+      margin-top: 8px; font-size: 11px; line-height: 1.55;
+      flex: 1 1 auto;
+      color: #666;
     }
     .overview-card .structure-grid {
-      margin-top: 4px; gap: 4px;
+      margin-top: 2px; gap: 6px; flex: 1 1 auto;
+      align-content: start;
     }
     .overview-card .structure-box {
-      padding: 4px 5px; border-radius: 8px;
+      padding: 6px 6px; border-radius: 8px;
     }
-    .overview-card .structure-box .k { font-size: 10px; margin-bottom: 0; }
+    .overview-card .structure-box .k { font-size: 10px; margin-bottom: 1px; }
     .overview-card .structure-box .v { font-size: 13px; }
-    .overview-card .structure-box .s { font-size: 9px; min-height: 0; margin-top: 0; }
+    .overview-card .structure-box .s { font-size: 9px; min-height: 0; margin-top: 1px; }
     .overview-card .structure-note {
-      margin-top: 4px; font-size: 10px; line-height: 1.35;
+      margin-top: auto; padding-top: 6px; font-size: 10px; line-height: 1.4;
+      flex: 0 0 auto;
     }
     .query-card .name { font-size: 18px; }
   </style>
@@ -453,7 +460,7 @@
     <div class="card overview-card">
       <div class="section-title">
         <span>📡 盘面速览</span>
-        <span class="hint">板块主值=榜周期主力；结构=今日分档代理</span>
+        <span class="hint">板块主值=榜周期主力；资金结构=今日分档代理</span>
       </div>
       <div class="stats" id="stats">
         <div class="stat-box"><span class="k">最强吸金</span><span class="v" id="stTop" style="font-size:14px">-</span><span class="s" id="stTopFlow">-</span></div>
@@ -494,7 +501,7 @@
 
         <div class="market-panel structure-panel">
         <h3>
-          <span>🧱 结构资金</span>
+          <span>🧱 资金结构</span>
           <span class="subk" id="structMeta">主力/散户代理 · 亿元</span>
         </h3>
         <div class="structure-grid" id="structGrid">
@@ -555,7 +562,7 @@
 
     <div class="footer-note">
       数据来源：东方财富板块资金流 / 指数成交额 / 涨跌停池 · 盘中约每 12–15 秒缓存<br />
-      预测量能=按近几日同时刻成交占比曲线外推（缺历史时回退线性）；涨跌停已剔除 ST；结构资金=订单规模代理+北向通道。信号仅供观察，不构成投资建议
+      预测量能=按近几日同时刻成交占比曲线外推（缺历史时回退线性）；涨跌停已剔除 ST；资金结构=订单规模代理+北向通道。信号仅供观察，不构成投资建议
     </div>
 
     </div><!-- /pageSector -->
@@ -1518,7 +1525,7 @@
 
     function renderStructure(struct) {
       if (!struct || !struct.ok) {
-        if ($("structMeta")) $("structMeta").textContent = "结构资金暂不可用";
+        if ($("structMeta")) $("structMeta").textContent = "资金结构暂不可用";
         return;
       }
       const hs = struct.hs || {};
@@ -1656,11 +1663,11 @@
       $("limitMeta").textContent = "剔ST · " + (lim.date || "") + " · " + (data.asof || "");
 
       const tops = [];
-      const upTop = (((lim.limit_up || {}).top) || []).slice(0, 4).map(function (x) { return x.name; }).filter(Boolean);
-      const dnTop = (((lim.limit_down || {}).top) || []).slice(0, 4).map(function (x) { return x.name; }).filter(Boolean);
+      const upTop = (((lim.limit_up || {}).top) || []).slice(0, 10).map(function (x) { return x.name; }).filter(Boolean);
+      const dnTop = (((lim.limit_down || {}).top) || []).slice(0, 10).map(function (x) { return x.name; }).filter(Boolean);
       if (upTop.length) tops.push("<b>涨停</b> " + upTop.join("、"));
       if (dnTop.length) tops.push("<b>跌停</b> " + dnTop.join("、"));
-      $("limitTops").innerHTML = tops.join(" · ") || "暂无涨跌停明细";
+      $("limitTops").innerHTML = tops.join("<br>") || "暂无涨跌停明细";
     }
 
     async function refreshMarket(manual) {

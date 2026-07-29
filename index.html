@@ -378,10 +378,11 @@
       margin: 0 0 8px; font-size: 14px; flex: 0 0 auto;
     }
     .overview-card .market-panel h3 .subk { font-size: 11px; }
-    .overview-card .mtable { font-size: 12px; flex: 0 0 auto; }
+    .overview-card .mtable { font-size: 14px; flex: 0 0 auto; }
     .overview-card .mtable th,
-    .overview-card .mtable td { padding: 3px 2px; }
-    .overview-card .mtable th { font-size: 11px; }
+    .overview-card .mtable td { padding: 4px 3px; }
+    .overview-card .mtable th { font-size: 12px; }
+    .overview-card .mtable td.b { font-size: 15px; }
     .overview-card .vol-vs-prev {
       margin-top: auto; padding: 6px 8px; font-size: 13px; border-radius: 6px;
     }
@@ -473,14 +474,14 @@
         <div class="market-panel">
           <h3>
             <span>📊 沪深京量能</span>
-            <span class="subk" id="volMeta">亿元</span>
+            <span class="subk" id="volMeta">进度 · 亿元</span>
           </h3>
           <table class="mtable">
             <thead>
-              <tr><th>市场</th><th>实际</th><th>预测全天</th><th>进度</th></tr>
+              <tr><th>市场</th><th>实际</th><th>预测全天</th></tr>
             </thead>
             <tbody id="volBody">
-              <tr><td colspan="4" style="text-align:center;color:#999">加载中…</td></tr>
+              <tr><td colspan="3" style="text-align:center;color:#999">加载中…</td></tr>
             </tbody>
           </table>
           <div id="volVsPrev" class="vol-vs-prev">较昨日量能：—</div>
@@ -1577,28 +1578,22 @@
       state._marketLast = data;
       renderStructure(data.structure || null);
       if (!data || !data.ok) {
-        $("volBody").innerHTML = '<tr><td colspan="4" style="text-align:center;color:#c0392b">量能加载失败</td></tr>';
+        $("volBody").innerHTML = '<tr><td colspan="3" style="text-align:center;color:#c0392b">量能加载失败</td></tr>';
         return;
       }
       const vol = data.volume || {};
       const sess = data.session || {};
       const prog = sess.progress_pct != null ? sess.progress_pct + "%" : "-";
-      const conf = confLabel(vol.predict_confidence);
-      const method = (vol.total && vol.total.predict_method) || vol.predict_method || "";
-      const ratio = vol.total && vol.total.profile_ratio != null
-        ? (" · 占比" + (Number(vol.total.profile_ratio) * 100).toFixed(0) + "%")
-        : "";
-      const methodLab = method === "profile" ? "曲线" : (method === "linear" ? "线性" : (method || "-"));
-      $("volMeta").textContent = "亿元";
+      $("volMeta").textContent = (prog && prog !== "-" ? ("进度" + prog + " · ") : "") + "亿元";
 
       const rows = [
-        { name: "上证", x: vol.sh, strong: false, showProg: false, indent: false },
-        { name: "科创板", x: vol.kc, strong: false, showProg: false, indent: true },
-        { name: "深成指", x: vol.sz, strong: false, showProg: false, indent: false },
-        { name: "创业板", x: vol.cyb, strong: false, showProg: false, indent: true },
-        { name: "北交所", x: vol.bj, strong: false, showProg: false, indent: false },
-        { name: "沪深两市", x: vol.hs, strong: true, showProg: false, indent: false },
-        { name: "沪深京合计", x: vol.total, strong: true, showProg: true, indent: false },
+        { name: "上证", x: vol.sh, strong: false, indent: false },
+        { name: "科创板", x: vol.kc, strong: false, indent: true },
+        { name: "深成指", x: vol.sz, strong: false, indent: false },
+        { name: "创业板", x: vol.cyb, strong: false, indent: true },
+        { name: "北交所", x: vol.bj, strong: false, indent: false },
+        { name: "沪深两市", x: vol.hs, strong: true, indent: false },
+        { name: "沪深京合计", x: vol.total, strong: true, indent: false },
       ];
       $("volBody").innerHTML = rows.map(function (row) {
         const x = row.x;
@@ -1616,7 +1611,6 @@
           + "<td>" + nameHtml + chg + "</td>"
           + '<td class="' + strong + '">' + act + "</td>"
           + '<td class="' + strong + '">' + pred + "</td>"
-          + "<td>" + (row.showProg ? prog : "") + "</td>"
           + "</tr>";
       }).join("");
 

@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="theme-color" content="#fffdf2" />
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
-  <title>板块流向 · 咕咕鸡</title>
+  <title>资金流向 · 咕咕鸡</title>
   <style>
     :root {
       --primary: #fbc02d;
@@ -251,7 +251,7 @@
   <div class="app">
     <div class="header">
       <a class="home-link" href="https://guguji.icu" title="返回主页">← 返回主页</a>
-      <h1>🐔 板块流向</h1>
+      <h1>🐔 资金流向</h1>
       <div class="sub" id="pageSub">
         实时识别 A 股行业 / 概念板块主力资金流向（东财口径）。盘中自动刷新，点击板块可下钻成分股。
       </div>
@@ -260,7 +260,7 @@
 
     <div class="page-tabs" id="pageTabs">
       <button type="button" class="page-tab active" data-page="sector">
-        📡 板块流向
+        📡 资金流向
         <small>东财行业/概念/地区</small>
       </button>
       <button type="button" class="page-tab" data-page="dark">
@@ -503,7 +503,7 @@
       });
       if (page === "sector") {
         $("pageSub").textContent = "实时识别 A 股行业 / 概念板块主力资金流向（东财口径）。盘中自动刷新，点击板块可下钻成分股。";
-        document.title = "板块流向 · 咕咕鸡";
+        document.title = "资金流向 · 咕咕鸡";
       } else {
         $("pageSub").textContent = "同花顺问财暗盘 / 明盘主力资金与 DDE（DDX/DDY/DDZ）。支持榜单与个股查询。";
         document.title = "暗盘资金 · 咕咕鸡";

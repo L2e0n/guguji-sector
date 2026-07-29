@@ -473,7 +473,7 @@
         <div class="market-panel">
           <h3>
             <span>📊 沪深京量能</span>
-            <span class="subk" id="volMeta">实际 / 预测今日 · 亿元</span>
+            <span class="subk" id="volMeta">亿元</span>
           </h3>
           <table class="mtable">
             <thead>
@@ -488,7 +488,7 @@
         <div class="market-panel">
           <h3>
             <span>🚦 涨跌停</span>
-            <span class="subk" id="limitMeta">已剔除 ST</span>
+            <span class="subk" id="limitMeta">剔ST</span>
           </h3>
           <div class="limit-stats" id="limitStats">
             <div class="limit-box"><span class="k">涨停</span><span class="v up" id="limUp">-</span><span class="s" id="limUpSub">-</span></div>
@@ -504,7 +504,7 @@
         <div class="market-panel structure-panel">
         <h3>
           <span>🧱 资金结构</span>
-          <span class="subk" id="structMeta">主力/散户代理 · 亿元</span>
+          <span class="subk" id="structMeta">亿元</span>
         </h3>
         <div class="structure-grid" id="structGrid">
           <div class="structure-box"><span class="k">主力净流入</span><span class="v" id="stForce">-</span><span class="s">超大+大单</span></div>
@@ -1568,7 +1568,7 @@
       }
       paint("stShForce", (struct.sh || {}).force_net_yi, 1);
       paint("stSzForce", (struct.sz || {}).force_net_yi, 1);
-      $("structMeta").textContent = (struct.scope || "沪深两市") + " · 亿";
+      $("structMeta").textContent = "亿元";
       $("structNote").textContent = struct.disclaimer
         || "主力=超大+大单，散户=小单，均为规模代理；北向为通道资金。";
     }
@@ -1589,7 +1589,7 @@
         ? (" · 占比" + (Number(vol.total.profile_ratio) * 100).toFixed(0) + "%")
         : "";
       const methodLab = method === "profile" ? "曲线" : (method === "linear" ? "线性" : (method || "-"));
-      $("volMeta").textContent = "实际/预测 · 进度" + prog + " · " + methodLab + ratio + " · 置信" + conf + " · 亿";
+      $("volMeta").textContent = "亿元";
 
       const rows = [
         { name: "上证", x: vol.sh, strong: false, showProg: false, indent: false },
@@ -1662,7 +1662,11 @@
       $("limDownSub").textContent = sum.st_limit_down ? ("另含ST " + sum.st_limit_down) : "剔ST";
       $("limBrokenSub").textContent = "曾触及涨停";
       $("limSealSub").textContent = "涨停/(涨停+炸板)";
-      $("limitMeta").textContent = "剔ST · " + (lim.date || "") + " · " + (data.asof || "");
+      const limDay = (lim.date || "").toString();
+      let limDayFmt = limDay;
+      if (/^\d{8}$/.test(limDay)) limDayFmt = limDay.slice(0,4) + "-" + limDay.slice(4,6) + "-" + limDay.slice(6,8);
+      else if (limDay.includes("T")) limDayFmt = limDay.slice(0, 10);
+      $("limitMeta").textContent = limDayFmt ? ("剔ST · " + limDayFmt) : "剔ST";
 
       const tops = [];
       const upTop = (((lim.limit_up || {}).top) || []).slice(0, 20).map(function (x) { return x.name; }).filter(Boolean);

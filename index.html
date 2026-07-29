@@ -128,6 +128,30 @@
     .limit-box .v { display:block; font-size: 18px; font-weight: 800; font-variant-numeric: tabular-nums; }
     .limit-box .s { display:block; font-size: 10px; color: #aaa; margin-top: 2px; min-height: 14px; }
     .limit-tops { margin-top: 8px; font-size: 11px; color: #666; line-height: 1.55; }
+    .structure-grid {
+      display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 8px; margin-top: 10px;
+    }
+    @media (min-width: 720px) {
+      .structure-grid { grid-template-columns: repeat(4, minmax(0,1fr)); }
+    }
+    .structure-box {
+      background: #fff; border: 1px solid #f0e6c0; border-radius: 10px; padding: 8px 8px 7px; text-align: center;
+    }
+    .structure-box .k { display:block; font-size: 11px; color: var(--muted); margin-bottom: 2px; }
+    .structure-box .v { display:block; font-size: 16px; font-weight: 800; font-variant-numeric: tabular-nums; }
+    .structure-box .s { display:block; font-size: 10px; color: #aaa; margin-top: 2px; min-height: 14px; }
+    .structure-note { margin-top: 8px; font-size: 11px; color: #888; line-height: 1.5; }
+    .profile-block { margin-top: 12px; padding-top: 10px; border-top: 1px dashed #f0e0a8; }
+    .profile-block h4 { margin: 0 0 8px; font-size: 13px; color: var(--secondary); }
+    .seat-list { font-size: 11px; color: #555; line-height: 1.55; }
+    .seat-tag {
+      display: inline-block; padding: 1px 6px; border-radius: 999px; font-size: 10px; font-weight: 700; margin-right: 4px;
+      background: #f4f4f4; color: #666;
+    }
+    .seat-tag.institution { background: #eaf2ff; color: #1a56c4; }
+    .seat-tag.hot_money { background: #fff1e6; color: #c45a00; }
+    .seat-tag.northbound { background: #eafaf1; color: #1e8449; }
+    .seat-tag.quant_suspect { background: #f5eafc; color: #7d3c98; }
     .limit-tops b { color: #333; }
     .chart-wrap canvas { width: 100%; height: 100%; display: block; cursor: crosshair; }
     .chart-empty {
@@ -333,6 +357,24 @@
         </div>
       </div>
 
+      <div class="market-panel" style="margin-top:10px">
+        <h3>
+          <span>🧱 结构资金</span>
+          <span class="subk" id="structMeta">主力/散户代理 · 亿元</span>
+        </h3>
+        <div class="structure-grid" id="structGrid">
+          <div class="structure-box"><span class="k">主力净流入</span><span class="v" id="stForce">-</span><span class="s">超大+大单</span></div>
+          <div class="structure-box"><span class="k">散户净流入</span><span class="v" id="stRetail">-</span><span class="s">小单代理</span></div>
+          <div class="structure-box"><span class="k">剪刀差</span><span class="v" id="stScissors">-</span><span class="s">主力−散户</span></div>
+          <div class="structure-box"><span class="k">大单占比</span><span class="v" id="stShare">-</span><span class="s" id="stShareSub">体量占比</span></div>
+          <div class="structure-box"><span class="k">主力净比</span><span class="v" id="stMainRatio">-</span><span class="s">东财 f184</span></div>
+          <div class="structure-box"><span class="k">北向净买</span><span class="v" id="stNorth">-</span><span class="s" id="stNorthSub">通道资金</span></div>
+          <div class="structure-box"><span class="k">沪市主力</span><span class="v" id="stShForce">-</span><span class="s">上证分档</span></div>
+          <div class="structure-box"><span class="k">深市主力</span><span class="v" id="stSzForce">-</span><span class="s">深成分档</span></div>
+        </div>
+        <div class="structure-note" id="structNote">规模代理口径：不能识别国家队/公募/私募真实账户。</div>
+      </div>
+
     </div>
 
     <div class="card" id="trendCard">
@@ -379,7 +421,7 @@
 
     <div class="footer-note">
       数据来源：东方财富板块资金流 / 指数成交额 / 涨跌停池 · 盘中约每 12–15 秒缓存<br />
-      预测量能=按近几日同时刻成交占比曲线外推（缺历史时回退线性）；涨跌停已剔除 ST。信号仅供观察，不构成投资建议
+      预测量能=按近几日同时刻成交占比曲线外推（缺历史时回退线性）；涨跌停已剔除 ST；结构资金=订单规模代理+北向通道。信号仅供观察，不构成投资建议
     </div>
 
     </div><!-- /pageSector -->
@@ -456,6 +498,14 @@
     };
 
     const $ = (id) => document.getElementById(id);
+
+    function fmtYiSigned(v, digits) {
+      if (v == null || Number.isNaN(Number(v))) return "-";
+      const n = Number(v);
+      const d = digits == null ? 1 : digits;
+      const sign = n > 0 ? "+" : "";
+      return sign + n.toFixed(d);
+    }
 
     function fmtYi(v) {
       if (v == null || Number.isNaN(v)) return "-";
@@ -726,9 +776,69 @@
         </div>`;
     }
 
-    function renderDarkQuery(item) {
+    function renderProfileBlock(profile) {
+      if (!profile || !profile.ok) {
+        return `<div class="profile-block"><h4>🧩 资金成分</h4><div class="structure-note">${(profile && profile.error) || "资金成分暂不可用"}</div></div>`;
+      }
+      const b = profile.buckets || {};
+      const m = profile.margin || {};
+      const lhb = profile.lhb || {};
+      const latest = m.latest || {};
+      const bucketsHtml = `
+        <div class="dark-metrics">
+          <div class="metric"><div class="k">主力(超大+大)</div><div class="v ${toneClass(b.force_net_yi)}">${fmtYiSigned(b.force_net_yi, 2)} 亿</div></div>
+          <div class="metric"><div class="k">散户(小单)</div><div class="v ${toneClass(b.retail_net_yi)}">${fmtYiSigned(b.retail_net_yi, 2)} 亿</div></div>
+          <div class="metric"><div class="k">剪刀差</div><div class="v ${toneClass(b.scissors_yi)}">${fmtYiSigned(b.scissors_yi, 2)} 亿</div></div>
+          <div class="metric"><div class="k">大单占比</div><div class="v">${b.size_main_share_pct == null ? "-" : Number(b.size_main_share_pct).toFixed(1) + "%"}</div></div>
+          <div class="metric"><div class="k">超大单</div><div class="v ${toneClass(b.super_net_yi)}">${fmtYiSigned(b.super_net_yi, 2)} 亿</div></div>
+          <div class="metric"><div class="k">大单</div><div class="v ${toneClass(b.large_net_yi)}">${fmtYiSigned(b.large_net_yi, 2)} 亿</div></div>
+          <div class="metric"><div class="k">中单</div><div class="v ${toneClass(b.mid_net_yi)}">${fmtYiSigned(b.mid_net_yi, 2)} 亿</div></div>
+          <div class="metric"><div class="k">主力净比</div><div class="v ${toneClass(b.main_ratio_pct)}">${b.main_ratio_pct == null ? "-" : Number(b.main_ratio_pct).toFixed(2) + "%"}</div></div>
+        </div>`;
+      let marginHtml = `<div class="structure-note" style="margin-top:8px">两融：暂无数据</div>`;
+      if (m.ok && latest) {
+        marginHtml = `
+          <div class="dark-metrics" style="margin-top:8px">
+            <div class="metric"><div class="k">融资余额</div><div class="v">${latest.rzye_yi == null ? "-" : Number(latest.rzye_yi).toFixed(2) + " 亿"}</div></div>
+            <div class="metric"><div class="k">融资净买</div><div class="v ${toneClass(latest.rzjme_yi)}">${fmtYiSigned(latest.rzjme_yi, 2)} 亿</div></div>
+            <div class="metric"><div class="k">余额较上日</div><div class="v ${toneClass(m.rzye_change_yi)}">${fmtYiSigned(m.rzye_change_yi, 2)} 亿</div></div>
+            <div class="metric"><div class="k">两融日期</div><div class="v" style="font-size:12px">${latest.date || "-"}</div></div>
+          </div>`;
+      }
+      let lhbHtml = `<div class="structure-note" style="margin-top:8px">龙虎榜：近端未上榜</div>`;
+      if (lhb.on_list && lhb.latest) {
+        const seats = (lhb.latest.seats || []).slice(0, 8).map((s) => {
+          return `<div><span class="seat-tag ${s.tag || "branch"}">${s.label || "营业部"}</span>${s.name || "-"} · 净 ${fmtYiSigned(s.net_yi, 2)} 亿 <span style="color:#aaa">(${s.side || ""})</span></div>`;
+        }).join("");
+        lhbHtml = `
+          <div style="margin-top:8px">
+            <div class="structure-note">龙虎榜 ${lhb.latest_date || ""} · ${lhb.latest.reason || ""}</div>
+            <div class="seat-list">${seats || "无席位明细"}</div>
+          </div>`;
+      }
+      const nb = profile.northbound || {};
+      const nbLine = nb.on_recent_lhb
+        ? "近期龙虎榜出现北向(股通)席位"
+        : (nb.hold_sample ? `持股样本：${nb.hold_sample.org || "-"} (${nb.hold_sample.date || ""})` : "北向：无强信号");
+      return `
+        <div class="profile-block">
+          <h4>🧩 资金成分 <span style="font-weight:500;color:#999;font-size:11px">规模代理 / 通道 / 席位事件</span></h4>
+          ${bucketsHtml}
+          ${marginHtml}
+          <div class="structure-note" style="margin-top:8px">${nbLine}</div>
+          ${lhbHtml}
+          <div class="structure-note">${profile.disclaimer || ""}</div>
+        </div>`;
+    }
+
+    function renderDarkQuery(item, profile) {
       const box = $("darkQueryResult");
       if (!item) {
+        // 无暗盘时仍可展示资金成分
+        if (profile && profile.ok) {
+          box.innerHTML = `<div class="row open" style="cursor:default"><div class="row-top"><div><span class="name">${profile.name || "-"}</span><span class="code">${profile.code || ""}</span></div></div><div class="detail">${renderProfileBlock(profile)}</div></div>`;
+          return;
+        }
         box.innerHTML = '<div class="empty">未查到该股票的暗盘数据</div>';
         return;
       }
@@ -757,6 +867,7 @@
               <div class="metric"><div class="k">DDZ</div><div class="v ${toneClass(item.ddz)}">${fmtNum(item.ddz, 3)}</div></div>
               <div class="metric"><div class="k">主力增仓占比</div><div class="v ${toneClass(item.add_ratio)}">${fmtPct(item.add_ratio)}</div></div>
             </div>
+            ${renderProfileBlock(profile)}
           </div>
         </div>`;
     }
@@ -820,7 +931,7 @@
         const res = await fetch(`${API_BASE}/api/dark/query?q=${encodeURIComponent(q)}`, { cache: "no-store" });
         const data = await res.json();
         if (!data.ok) throw new Error(data.error || "查询失败");
-        renderDarkQuery(data.item);
+        renderDarkQuery(data.item, data.profile);
         if (data.asof || data.asof_day) {
           $("darkAsofText").textContent = `数据时点：${data.asof_day || data.asof}`;
         }
@@ -1179,8 +1290,58 @@
       return ({ high: "高", medium: "中", low: "偏低", very_low: "很低" })[c] || "-";
     }
 
+
+    function renderStructure(struct) {
+      if (!struct || !struct.ok) {
+        if ($("structMeta")) $("structMeta").textContent = "结构资金暂不可用";
+        return;
+      }
+      const hs = struct.hs || {};
+      const nb = struct.northbound || {};
+      const setTone = (id, val) => {
+        const el = $(id);
+        if (!el) return;
+        el.textContent = val;
+      };
+      const paint = (id, num, digits) => {
+        const el = $(id);
+        if (!el) return;
+        el.textContent = fmtYiSigned(num, digits == null ? 1 : digits);
+        el.className = "v " + toneClass(num);
+      };
+      paint("stForce", hs.force_net_yi, 1);
+      paint("stRetail", hs.retail_net_yi, 1);
+      paint("stScissors", hs.scissors_yi, 1);
+      if (hs.size_main_share_pct != null) {
+        setTone("stShare", Number(hs.size_main_share_pct).toFixed(1) + "%");
+        $("stShare").className = "v";
+      } else {
+        setTone("stShare", "-");
+      }
+      if (hs.main_ratio_pct != null) {
+        paint("stMainRatio", hs.main_ratio_pct, 2);
+        // main_ratio is percent already; tone by sign
+      } else {
+        setTone("stMainRatio", "-");
+      }
+      if (nb && nb.ok && nb.total_net_yi != null) {
+        paint("stNorth", nb.total_net_yi, 2);
+        $("stNorthSub").textContent = (nb.asof_time ? ("截至 " + nb.asof_time) : "通道资金")
+          + (nb.date ? (" · " + String(nb.date).slice(0, 10)) : "");
+      } else {
+        setTone("stNorth", "-");
+        $("stNorthSub").textContent = "暂无有效北向点";
+      }
+      paint("stShForce", (struct.sh || {}).force_net_yi, 1);
+      paint("stSzForce", (struct.sz || {}).force_net_yi, 1);
+      $("structMeta").textContent = (struct.scope || "沪深两市") + " · 亿";
+      $("structNote").textContent = struct.disclaimer
+        || "主力=超大+大单，散户=小单，均为规模代理；北向为通道资金。";
+    }
+
     function renderMarket(data) {
       state._marketLast = data;
+      renderStructure(data.structure || null);
       if (!data || !data.ok) {
         $("volBody").innerHTML = '<tr><td colspan="4" style="text-align:center;color:#c0392b">量能加载失败</td></tr>';
         return;

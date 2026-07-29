@@ -1057,6 +1057,72 @@
       }
     }
 
+    function renderTrendLegend(series) {
+      const el = $("trendLegend");
+      if (!series || !series.length) {
+        el.innerHTML = "";
+        return;
+      }
+      el.innerHTML = series.map((s, idx) => {
+        const color = s._color || colorForSeries(s, idx);
+        const off = state.trendHidden[s.code] ? "off" : "";
+        return '<span class="lg-item ' + off + '" data-code="' + s.code + '" title="点击显隐">' +
+          '<i class="lg-dot" style="background:' + color + '"></i>' +
+          '<span>' + (s.name || "") + '</span>' +
+          '<span class="lg-val ' + toneClass(s.main_net_yi) + '">' + fmtYi(s.main_net_yi) + '</span>' +
+        '</span>';
+      }).join("");
+      el.querySelectorAll(".lg-item").forEach((node) => {
+        node.addEventListener("click", () => {
+          const code = node.getAttribute("data-code");
+          state.trendHidden[code] = !state.trendHidden[code];
+          renderTrendLegend(series);
+          paintTrendChart();
+        });
+      });
+    }
+
+    async function refreshTrend(manual = false) {
+      if (state.period !== "1") {
+        state._trendLast = { series: [] };
+        $("trendStatus").textContent = "仅今日可用";
+        $("trendHint").textContent = "切换到「今日」查看盘中轨迹";
+        $("trendEmpty").style.display = "flex";
+        $("trendEmpty").textContent = "时序图仅支持「今日」盘中累计";
+        $("trendLegend").innerHTML = "";
+        paintTrendChart();
+        return;
+      }
+      const btn = $("trendRefreshBtn");
+      if (btn) btn.disabled = true;
+      $("trendStatus").textContent = manual ? "强刷轨迹…" : "轨迹更新中…";
+      try {
+        const q = new URLSearchParams({
+          type: state.type,
+          limit: String(state.trendLimit || 40),
+          klt: "1",
+          refresh: manual ? "1" : "0",
+        });
+        const res = await fetch(API_BASE + "/api/sector/intraday?" + q.toString(), { cache: "no-store" });
+        const data = await res.json();
+        if (!data.ok) throw new Error(data.error || "轨迹接口失败");
+        (data.series || []).forEach((s, i) => { s._color = colorForSeries(s, i); });
+        state._trendLast = data;
+        const em = data.em_series || 0;
+        const n = data.count || 0;
+        $("trendStatus").textContent = (data.cached ? "轨迹缓存 · " : "轨迹已更新 · ") + n + "板";
+        $("trendHint").textContent = "主力净流入累计 · 亿元 · 东财分时" + em + "条 · " + (data.asof || "");
+        renderTrendLegend(data.series || []);
+        paintTrendChart();
+      } catch (e) {
+        $("trendStatus").textContent = "轨迹失败：" + (e.message || e);
+        $("trendEmpty").style.display = "flex";
+        $("trendEmpty").textContent = "加载失败：" + (e.message || e);
+      } finally {
+        if (btn) btn.disabled = false;
+      }
+    }
+
     function bindTrendCanvas() {
       const canvas = $("trendCanvas");
       if (!canvas || canvas._bound) return;

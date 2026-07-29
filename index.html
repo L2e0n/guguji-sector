@@ -104,6 +104,15 @@
       display:flex; justify-content:space-between; gap:8px; align-items:center;
     }
     .market-panel h3 .subk { font-size: 11px; color: var(--muted); font-weight: 500; }
+    .vol-vs-prev {
+      margin-top: 8px; padding: 6px 8px; border-radius: 8px;
+      background: #f7f8fa; font-size: 13px; font-weight: 700;
+      font-variant-numeric: tabular-nums; text-align: center;
+    }
+    .vol-vs-prev.expand { color: #c0392b; background: #fdecea; }
+    .vol-vs-prev.shrink { color: #1e8449; background: #eafaf1; }
+    .vol-vs-prev.flat { color: #666; }
+
     .mtable { width: 100%; border-collapse: collapse; font-size: 12px; table-layout: fixed; }
     .mtable th, .mtable td { padding: 4px 2px; text-align: right; font-variant-numeric: tabular-nums; }
     .mtable th:first-child, .mtable td:first-child { text-align: left; }
@@ -305,6 +314,7 @@
               <tr><td colspan="4" style="text-align:center;color:#999">加载中…</td></tr>
             </tbody>
           </table>
+          <div id="volVsPrev" class="vol-vs-prev">较昨日量能：—</div>
         </div>
         <div class="market-panel">
           <h3>
@@ -1209,6 +1219,29 @@
           + "<td>" + (i === 4 ? prog : "") + "</td>"
           + "</tr>";
       }).join("");
+
+      // 较昨日放量/缩量
+      const vsEl = $("volVsPrev");
+      if (vsEl) {
+        const vs = vol.vs_prev || {};
+        const lab = vs.label;
+        const dYi = vs.delta_yi;
+        const prevYi = vs.prev_hs_amount_yi;
+        const prevDay = vs.prev_day || "";
+        vsEl.className = "vol-vs-prev";
+        if (lab && dYi != null) {
+          const absYi = Math.abs(Number(dYi));
+          const absTxt = absYi >= 100 ? absYi.toFixed(0) : absYi.toFixed(1);
+          const dir = vs.direction || "";
+          if (dir) vsEl.classList.add(dir);
+          const sign = Number(dYi) > 0 ? "+" : (Number(dYi) < 0 ? "-" : "");
+          const basisHint = vs.basis && String(vs.basis).indexOf("predict") === 0 ? "预测" : "实际";
+          vsEl.textContent = "较昨日" + lab + " " + sign + absTxt + "亿"
+            + (prevYi != null ? "（昨" + Number(prevYi).toFixed(0) + "亿" + (prevDay ? " " + prevDay.slice(5) : "") + " · " + basisHint + "）" : "");
+        } else {
+          vsEl.textContent = "较昨日量能：—";
+        }
+      }
 
       const lim = data.limit || {};
       const sum = lim.summary || {};

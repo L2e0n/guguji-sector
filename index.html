@@ -1663,8 +1663,8 @@
       $("limitMeta").textContent = "剔ST · " + (lim.date || "") + " · " + (data.asof || "");
 
       const tops = [];
-      const upTop = (((lim.limit_up || {}).top) || []).slice(0, 10).map(function (x) { return x.name; }).filter(Boolean);
-      const dnTop = (((lim.limit_down || {}).top) || []).slice(0, 10).map(function (x) { return x.name; }).filter(Boolean);
+      const upTop = (((lim.limit_up || {}).top) || []).slice(0, 20).map(function (x) { return x.name; }).filter(Boolean);
+      const dnTop = (((lim.limit_down || {}).top) || []).slice(0, 20).map(function (x) { return x.name; }).filter(Boolean);
       if (upTop.length) tops.push("<b>涨停</b> " + upTop.join("、"));
       if (dnTop.length) tops.push("<b>跌停</b> " + dnTop.join("、"));
       $("limitTops").innerHTML = tops.join("<br>") || "暂无涨跌停明细";

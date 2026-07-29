@@ -66,7 +66,7 @@
     .stats {
       display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 8px;
     }
-    @media (min-width: 640px) { .stats { grid-template-columns: repeat(4, minmax(0,1fr)); } }
+    @media (min-width: 640px) { .stats { grid-template-columns: repeat(2, minmax(0,1fr)); } }
     .stat-box {
       background: #fffaf0; border: 1px solid #ffe9a8; border-radius: 12px; padding: 10px;
     }
@@ -287,10 +287,8 @@
         <span class="hint">基于当前列表 Top 口径</span>
       </div>
       <div class="stats" id="stats">
-        <div class="stat-box"><span class="k">净流入板块</span><span class="v" id="stIn">-</span><span class="s">家</span></div>
-        <div class="stat-box"><span class="k">净流出板块</span><span class="v" id="stOut">-</span><span class="s">家</span></div>
-        <div class="stat-box"><span class="k">列表净额</span><span class="v" id="stNet">-</span><span class="s">亿</span></div>
         <div class="stat-box"><span class="k">最强吸金</span><span class="v" id="stTop" style="font-size:14px">-</span><span class="s" id="stTopFlow">-</span></div>
+        <div class="stat-box"><span class="k">最多流出</span><span class="v" id="stBot" style="font-size:14px">-</span><span class="s" id="stBotFlow">-</span></div>
       </div>
 
       <div class="market-grid">
@@ -371,7 +369,7 @@
 
     <div class="footer-note">
       数据来源：东方财富板块资金流 / 指数成交额 / 涨跌停池 · 盘中约每 12–15 秒缓存<br />
-      预测量能=按连续竞价已过分钟线性外推；涨跌停已剔除 ST。信号仅供观察，不构成投资建议
+      预测量能=按近几日同时刻成交占比曲线外推（缺历史时回退线性）；涨跌停已剔除 ST。信号仅供观察，不构成投资建议
     </div>
 
     </div><!-- /pageSector -->
@@ -622,18 +620,14 @@
       const all = inflow.concat(outflow);
       state.maxAbs = Math.max(0.01, ...all.map((x) => Math.abs(x.main_net_yi || 0)));
 
-      const inCount = inflow.filter((x) => (x.main_net || 0) > 0).length;
-      const outCount = outflow.filter((x) => (x.main_net || 0) < 0).length;
-      const net = all.reduce((s, x) => s + (x.main_net_yi || 0), 0) / 2; // dual lists overlap less; rough
-      // better: sum inflow page only for "列表净额" use summary if present
-      const pageNet = data.summary?.inflow?.page_main_net_yi;
-      $("stIn").textContent = data.summary?.inflow?.inflow_count ?? inCount;
-      $("stOut").textContent = data.summary?.outflow?.outflow_count ?? outCount;
-      $("stNet").textContent = pageNet == null ? fmtYi(net).replace("+","") : Number(pageNet).toFixed(2);
-      $("stNet").className = "v " + toneClass(pageNet ?? net);
       const top = inflow[0];
       $("stTop").textContent = top?.name || "-";
       $("stTopFlow").textContent = top ? `${fmtYi(top.main_net_yi)}亿 · ${fmtPct(top.change_pct)}` : "-";
+      $("stTop").className = "v up";
+      const bot = outflow[0];
+      $("stBot").textContent = bot?.name || "-";
+      $("stBotFlow").textContent = bot ? `${fmtYi(bot.main_net_yi)}亿 · ${fmtPct(bot.change_pct)}` : "-";
+      $("stBot").className = "v down";
 
       $("inHint").textContent = `${periodLabel(state.period)} · 单位亿`;
       $("outHint").textContent = `${periodLabel(state.period)} · 单位亿`;
@@ -1185,7 +1179,12 @@
       const sess = data.session || {};
       const prog = sess.progress_pct != null ? sess.progress_pct + "%" : "-";
       const conf = confLabel(vol.predict_confidence);
-      $("volMeta").textContent = "实际/预测 · 进度" + prog + " · 置信" + conf + " · 亿";
+      const method = (vol.total && vol.total.predict_method) || vol.predict_method || "";
+      const ratio = vol.total && vol.total.profile_ratio != null
+        ? (" · 占比" + (Number(vol.total.profile_ratio) * 100).toFixed(0) + "%")
+        : "";
+      const methodLab = method === "profile" ? "曲线" : (method === "linear" ? "线性" : (method || "-"));
+      $("volMeta").textContent = "实际/预测 · 进度" + prog + " · " + methodLab + ratio + " · 置信" + conf + " · 亿";
 
       const rows = [
         ["上海", vol.sh],

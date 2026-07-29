@@ -1197,26 +1197,31 @@
       $("volMeta").textContent = "实际/预测 · 进度" + prog + " · " + methodLab + ratio + " · 置信" + conf + " · 亿";
 
       const rows = [
-        ["上海", vol.sh],
-        ["深圳", vol.sz],
-        ["北交所", vol.bj],
-        ["沪深两市", vol.hs],
-        ["沪深京合计", vol.total],
+        { name: "上证", x: vol.sh, strong: false, showProg: false, indent: false },
+        { name: "科创板", x: vol.kc, strong: false, showProg: false, indent: true },
+        { name: "深成指", x: vol.sz, strong: false, showProg: false, indent: false },
+        { name: "创业板", x: vol.cyb, strong: false, showProg: false, indent: true },
+        { name: "北交所", x: vol.bj, strong: false, showProg: false, indent: false },
+        { name: "沪深两市", x: vol.hs, strong: true, showProg: false, indent: false },
+        { name: "沪深京合计", x: vol.total, strong: true, showProg: true, indent: false },
       ];
-      $("volBody").innerHTML = rows.map(function (pair, i) {
-        const name = pair[0], x = pair[1];
+      $("volBody").innerHTML = rows.map(function (row) {
+        const x = row.x;
         if (!x) return "";
         const act = x.amount_yi == null ? "-" : Number(x.amount_yi).toFixed(0);
         const pred = x.predict_amount_yi == null ? "-" : Number(x.predict_amount_yi).toFixed(0);
-        const strong = i >= 3 ? "b" : "";
+        const strong = row.strong ? "b" : "";
         const chg = x.change_pct != null
           ? ' <span class="' + toneClass(x.change_pct) + '" style="font-weight:600">' + fmtPct(x.change_pct) + "</span>"
           : "";
+        const nameHtml = row.indent
+          ? '<span style="color:#999;margin-right:2px">└</span><span style="color:#666">' + row.name + "</span>"
+          : row.name;
         return "<tr>"
-          + "<td>" + name + chg + "</td>"
+          + "<td>" + nameHtml + chg + "</td>"
           + '<td class="' + strong + '">' + act + "</td>"
           + '<td class="' + strong + '">' + pred + "</td>"
-          + "<td>" + (i === 4 ? prog : "") + "</td>"
+          + "<td>" + (row.showProg ? prog : "") + "</td>"
           + "</tr>";
       }).join("");
 

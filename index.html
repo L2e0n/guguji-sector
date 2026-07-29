@@ -73,6 +73,33 @@
     .stat-box .k { display: block; color: var(--muted); font-size: 11px; margin-bottom: 4px; }
     .stat-box .v { font-size: 16px; font-weight: 800; font-variant-numeric: tabular-nums; }
     .stat-box .s { display: block; margin-top: 2px; font-size: 11px; color: #999; }
+
+    .chart-wrap {
+      position: relative; width: 100%; height: 300px;
+      background: linear-gradient(180deg, #fffef8 0%, #fff 100%);
+      border: 1px solid #f0e6c0; border-radius: 12px; overflow: hidden;
+    }
+    .chart-wrap canvas { width: 100%; height: 100%; display: block; cursor: crosshair; }
+    .chart-empty {
+      position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+      color: var(--muted); font-size: 13px; pointer-events: none;
+    }
+    .chart-legend {
+      display: flex; flex-wrap: wrap; gap: 6px; max-height: 96px; overflow: auto;
+      margin-top: 10px; padding-top: 4px;
+    }
+    .lg-item {
+      display: inline-flex; align-items: center; gap: 5px;
+      border: 1px solid #eee; background: #fafafa; border-radius: 999px;
+      padding: 3px 8px; font-size: 11px; cursor: pointer; user-select: none;
+    }
+    .lg-item.off { opacity: 0.35; text-decoration: line-through; }
+    .lg-dot { width: 8px; height: 8px; border-radius: 50%; flex: 0 0 auto; }
+    .lg-val { font-variant-numeric: tabular-nums; font-weight: 700; }
+    .chart-toolbar { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-bottom: 8px; }
+    .chart-tip {
+      font-size: 11px; color: var(--muted); margin-top: 6px; line-height: 1.4;
+    }
     .cols {
       display: grid; grid-template-columns: 1fr; gap: 12px;
     }
@@ -226,6 +253,30 @@
       </div>
     </div>
 
+    <div class="card" id="trendCard">
+      <div class="section-title">
+        <span>📈 盘中资金轨迹</span>
+        <span class="hint" id="trendHint">主力净流入累计 · 亿元</span>
+      </div>
+      <div class="chart-toolbar">
+        <div class="seg" id="trendLimitSeg">
+          <button type="button" class="btn secondary" data-limit="20">20板</button>
+          <button type="button" class="btn active" data-limit="40">40板</button>
+          <button type="button" class="btn secondary" data-limit="60">60板</button>
+        </div>
+        <button id="trendRefreshBtn" class="btn secondary" type="button">刷新轨迹</button>
+        <span class="status-pill" id="trendStatus">轨迹待命</span>
+      </div>
+      <div class="chart-wrap" id="trendWrap">
+        <canvas id="trendCanvas"></canvas>
+        <div class="chart-empty" id="trendEmpty">加载盘中轨迹…</div>
+      </div>
+      <div class="chart-legend" id="trendLegend"></div>
+      <div class="chart-tip" id="trendTip">
+        覆盖净流入/流出绝对值最大的板块；优先东财分时主力资金，并叠加服务端快照以保持最新。点击图例可显隐单线。
+      </div>
+    </div>
+
     <div class="cols">
       <div class="card">
         <div class="section-title">
@@ -314,6 +365,10 @@
       darkOpenCode: null,
       darkMaxAbs: 1,
       _darkLast: null,
+      trendLimit: 40,
+      trendHidden: {},
+      _trendLast: null,
+      _trendHover: null,
     };
 
     const $ = (id) => document.getElementById(id);
@@ -503,6 +558,7 @@
 
       renderList($("inList"), inflow, "in");
       renderList($("outList"), outflow, "out");
+        refreshTrend(false);
       if (state.openCode) loadMembers(state.openCode);
     }
 
@@ -687,6 +743,298 @@
       }
     }
 
+﻿    const TREND_PALETTE_UP = ["#e74c3c","#c0392b","#ff6b6b","#e67e22","#d35400","#f39c12","#e17055","#fd79a8","#e84393","#ff7675","#fab1a0","#fdcb6e","#ff9f43","#ee5a24","#b71540","#c44569","#f8a5c2","#f19066","#e15f41","#ff6348"];
+    const TREND_PALETTE_DOWN = ["#27ae60","#1e8449","#2ecc71","#16a085","#1abc9c","#00b894","#55efc4","#00cec9","#0984e3","#74b9ff","#6c5ce7","#a29bfe","#636e72","#2d3436","#10ac84","#01a3a4","#2e86de","#341f97","#5f27cd","#20bf6b"];
+
+    function timeToSessionX(t) {
+      if (!t) return 0;
+      const parts = String(t).split(":");
+      const h = Number(parts[0]);
+      const m = Number(parts[1] || 0);
+      const mins = h * 60 + m;
+      const m0930 = 9 * 60 + 30;
+      const m1130 = 11 * 60 + 30;
+      const m1300 = 13 * 60;
+      const m1500 = 15 * 60;
+      if (mins <= m0930) return 0;
+      if (mins <= m1130) return (mins - m0930) / 240;
+      if (mins < m1300) return 120 / 240;
+      if (mins >= m1500) return 1;
+      return (120 + (mins - m1300)) / 240;
+    }
+
+    function colorForSeries(item, idx) {
+      const v = Number(item.main_net_yi || 0);
+      const pal = v >= 0 ? TREND_PALETTE_UP : TREND_PALETTE_DOWN;
+      return pal[idx % pal.length];
+    }
+
+    function paintTrendChart() {
+      const data = state._trendLast;
+      const canvas = $("trendCanvas");
+      const empty = $("trendEmpty");
+      if (!canvas) return;
+      const dpr = window.devicePixelRatio || 1;
+      const rect = canvas.parentElement.getBoundingClientRect();
+      const cssW = Math.max(320, rect.width || 320);
+      const cssH = Math.max(260, rect.height || 300);
+      canvas.width = Math.floor(cssW * dpr);
+      canvas.height = Math.floor(cssH * dpr);
+      canvas.style.width = cssW + "px";
+      canvas.style.height = cssH + "px";
+      const ctx = canvas.getContext("2d");
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      ctx.clearRect(0, 0, cssW, cssH);
+
+      const seriesAll = (data && data.series) || [];
+      const series = seriesAll.filter((s) => !state.trendHidden[s.code] && (s.points || []).length);
+      if (!series.length) {
+        empty.style.display = "flex";
+        empty.textContent = state.period !== "1"
+          ? "时序图仅支持「今日」盘中累计"
+          : (data ? "暂无分时轨迹（开盘后或刷新后生成）" : "加载盘中轨迹…");
+        return;
+      }
+      empty.style.display = "none";
+
+      const pad = { l: 48, r: 72, t: 16, b: 28 };
+      const W = cssW - pad.l - pad.r;
+      const H = cssH - pad.t - pad.b;
+
+      let ymin = 0, ymax = 0;
+      series.forEach((s) => {
+        (s.points || []).forEach((p) => {
+          const v = Number(p.main_net_yi);
+          if (!Number.isFinite(v)) return;
+          ymin = Math.min(ymin, v);
+          ymax = Math.max(ymax, v);
+        });
+      });
+      if (ymin === ymax) { ymin -= 1; ymax += 1; }
+      const padY = Math.max(0.5, (ymax - ymin) * 0.08);
+      ymin -= padY; ymax += padY;
+
+      const xOf = (t) => pad.l + timeToSessionX(t) * W;
+      const yOf = (v) => pad.t + (1 - (v - ymin) / (ymax - ymin)) * H;
+
+      ctx.fillStyle = "#fffef8";
+      ctx.fillRect(0, 0, cssW, cssH);
+      ctx.strokeStyle = "#f0e6c0";
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.rect(pad.l, pad.t, W, H);
+      ctx.stroke();
+
+      if (ymin < 0 && ymax > 0) {
+        ctx.strokeStyle = "#ccc";
+        ctx.setLineDash([4, 4]);
+        ctx.beginPath();
+        ctx.moveTo(pad.l, yOf(0));
+        ctx.lineTo(pad.l + W, yOf(0));
+        ctx.stroke();
+        ctx.setLineDash([]);
+      }
+
+      ["09:30", "10:30", "11:30", "14:00", "15:00"].forEach((t) => {
+        const x = xOf(t);
+        ctx.strokeStyle = "#f5edd0";
+        ctx.beginPath();
+        ctx.moveTo(x, pad.t);
+        ctx.lineTo(x, pad.t + H);
+        ctx.stroke();
+        ctx.fillStyle = "#999";
+        ctx.font = "11px sans-serif";
+        ctx.textAlign = "center";
+        ctx.fillText(t, x, cssH - 8);
+      });
+
+      const ticks = 5;
+      ctx.font = "11px sans-serif";
+      ctx.textAlign = "right";
+      for (let i = 0; i <= ticks; i++) {
+        const v = ymin + (ymax - ymin) * (i / ticks);
+        const y = yOf(v);
+        ctx.strokeStyle = "#f7f0d8";
+        ctx.beginPath();
+        ctx.moveTo(pad.l, y);
+        ctx.lineTo(pad.l + W, y);
+        ctx.stroke();
+        ctx.fillStyle = "#888";
+        ctx.fillText(v.toFixed(1), pad.l - 6, y + 3);
+      }
+
+      series.forEach((s, idx) => {
+        const color = s._color || colorForSeries(s, idx);
+        const pts = s.points || [];
+        if (pts.length < 1) return;
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 1.6;
+        ctx.lineJoin = "round";
+        ctx.beginPath();
+        pts.forEach((p, i) => {
+          const x = xOf(p.t);
+          const y = yOf(Number(p.main_net_yi) || 0);
+          if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+        });
+        ctx.stroke();
+        const last = pts[pts.length - 1];
+        const lx = xOf(last.t);
+        const ly = yOf(Number(last.main_net_yi) || 0);
+        ctx.fillStyle = color;
+        ctx.beginPath();
+        ctx.arc(lx, ly, 2.4, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.font = "10px sans-serif";
+        ctx.textAlign = "left";
+        ctx.fillText(s.name + " " + fmtYi(last.main_net_yi), Math.min(lx + 4, cssW - pad.r + 4), ly - 2);
+      });
+
+      const hv = state._trendHover;
+      if (hv && hv.t) {
+        const x = xOf(hv.t);
+        ctx.strokeStyle = "rgba(44,62,80,.35)";
+        ctx.setLineDash([3, 3]);
+        ctx.beginPath();
+        ctx.moveTo(x, pad.t);
+        ctx.lineTo(x, pad.t + H);
+        ctx.stroke();
+        ctx.setLineDash([]);
+        const lines = hv.rows || [];
+        if (lines.length) {
+          const boxW = 170;
+          const boxH = 16 + lines.length * 14;
+          let bx = x + 10;
+          if (bx + boxW > cssW - 4) bx = x - boxW - 10;
+          const by = pad.t + 8;
+          ctx.fillStyle = "rgba(255,255,255,.94)";
+          ctx.strokeStyle = "#f0e6c0";
+          ctx.beginPath();
+          ctx.rect(bx, by, boxW, boxH);
+          ctx.fill();
+          ctx.stroke();
+          ctx.font = "11px sans-serif";
+          ctx.textAlign = "left";
+          ctx.fillStyle = "#333";
+          ctx.fillText(hv.t, bx + 8, by + 14);
+          lines.forEach((row, i) => {
+            ctx.fillStyle = row.color || "#333";
+            ctx.fillText(row.name + " " + fmtYi(row.v), bx + 8, by + 28 + i * 14);
+          });
+        }
+      }
+    }
+
+    function renderTrendLegend(series) {
+      const el = $("trendLegend");
+      if (!series || !series.length) {
+        el.innerHTML = "";
+        return;
+      }
+      el.innerHTML = series.map((s, idx) => {
+        const color = s._color || colorForSeries(s, idx);
+        const off = state.trendHidden[s.code] ? "off" : "";
+        return '<span class="lg-item ' + off + '" data-code="' + s.code + '" title="点击显隐">' +
+          '<i class="lg-dot" style="background:' + color + '"></i>' +
+          '<span>' + (s.name || "") + '</span>' +
+          '<span class="lg-val ' + toneClass(s.main_net_yi) + '">' + fmtYi(s.main_net_yi) + '</span>' +
+        '</span>';
+      }).join("");
+      el.querySelectorAll(".lg-item").forEach((node) => {
+        node.addEventListener("click", () => {
+          const code = node.getAttribute("data-code");
+          state.trendHidden[code] = !state.trendHidden[code];
+          renderTrendLegend(series);
+          paintTrendChart();
+        });
+      });
+    }
+
+    async function refreshTrend(manual = false) {
+      if (state.period !== "1") {
+        state._trendLast = { series: [] };
+        $("trendStatus").textContent = "仅今日可用";
+        $("trendHint").textContent = "切换到「今日」查看盘中轨迹";
+        $("trendEmpty").style.display = "flex";
+        $("trendEmpty").textContent = "时序图仅支持「今日」盘中累计";
+        $("trendLegend").innerHTML = "";
+        paintTrendChart();
+        return;
+      }
+      const btn = $("trendRefreshBtn");
+      if (btn) btn.disabled = true;
+      $("trendStatus").textContent = manual ? "强刷轨迹…" : "轨迹更新中…";
+      try {
+        const q = new URLSearchParams({
+          type: state.type,
+          limit: String(state.trendLimit || 40),
+          klt: "1",
+          refresh: manual ? "1" : "0",
+        });
+        const res = await fetch(API_BASE + "/api/sector/intraday?" + q.toString(), { cache: "no-store" });
+        const data = await res.json();
+        if (!data.ok) throw new Error(data.error || "轨迹接口失败");
+        (data.series || []).forEach((s, i) => { s._color = colorForSeries(s, i); });
+        state._trendLast = data;
+        const em = data.em_series || 0;
+        const n = data.count || 0;
+        $("trendStatus").textContent = (data.cached ? "轨迹缓存 · " : "轨迹已更新 · ") + n + "板";
+        $("trendHint").textContent = "主力净流入累计 · 亿元 · 东财分时" + em + "条 · " + (data.asof || "");
+        renderTrendLegend(data.series || []);
+        paintTrendChart();
+      } catch (e) {
+        $("trendStatus").textContent = "轨迹失败：" + (e.message || e);
+        $("trendEmpty").style.display = "flex";
+        $("trendEmpty").textContent = "加载失败：" + (e.message || e);
+      } finally {
+        if (btn) btn.disabled = false;
+      }
+    }
+
+    function bindTrendCanvas() {
+      const canvas = $("trendCanvas");
+      if (!canvas || canvas._bound) return;
+      canvas._bound = true;
+      const pick = (ev) => {
+        const data = state._trendLast;
+        if (!data || !data.series) return;
+        const rect = canvas.getBoundingClientRect();
+        const x = (ev.clientX - rect.left);
+        const padL = 48;
+        const padR = 72;
+        const W = rect.width - padL - padR;
+        const rel = Math.min(1, Math.max(0, (x - padL) / Math.max(W, 1)));
+        const times = new Set();
+        (data.series || []).forEach((s) => (s.points || []).forEach((p) => times.add(p.t)));
+        const arr = Array.from(times).filter(Boolean).sort((a, b) => timeToSessionX(a) - timeToSessionX(b));
+        if (!arr.length) return;
+        let best = arr[0], bestD = 1e9;
+        arr.forEach((t) => {
+          const d = Math.abs(timeToSessionX(t) - rel);
+          if (d < bestD) { bestD = d; best = t; }
+        });
+        const rows = [];
+        (data.series || []).forEach((s, idx) => {
+          if (state.trendHidden[s.code]) return;
+          const pts = s.points || [];
+          let pt = pts.find((p) => p.t === best);
+          if (!pt) {
+            for (let i = pts.length - 1; i >= 0; i--) {
+              if (timeToSessionX(pts[i].t) <= timeToSessionX(best)) { pt = pts[i]; break; }
+            }
+          }
+          if (!pt) return;
+          rows.push({ name: s.name, v: pt.main_net_yi, color: s._color || colorForSeries(s, idx) });
+        });
+        rows.sort((a, b) => Math.abs(b.v || 0) - Math.abs(a.v || 0));
+        state._trendHover = { t: best, rows: rows.slice(0, 10) };
+        paintTrendChart();
+      };
+      canvas.addEventListener("mousemove", pick);
+      canvas.addEventListener("mouseleave", () => { state._trendHover = null; paintTrendChart(); });
+      window.addEventListener("resize", () => paintTrendChart());
+    }
+
+
     function setupAuto() {
       if (state.timer) clearInterval(state.timer);
       state.timer = null;
@@ -704,6 +1052,16 @@
       if (!btn) return;
       setPage(btn.getAttribute("data-page"));
     });
+    $("trendLimitSeg").addEventListener("click", (e) => {
+      const btn = e.target.closest("button[data-limit]");
+      if (!btn) return;
+      state.trendLimit = Number(btn.getAttribute("data-limit") || 40);
+      state.trendHidden = {};
+      setActiveSeg("trendLimitSeg", "data-limit", String(state.trendLimit));
+      refreshTrend(true);
+    });
+    $("trendRefreshBtn").addEventListener("click", () => refreshTrend(true));
+    bindTrendCanvas();
     $("darkSortSeg").addEventListener("click", (e) => {
       const btn = e.target.closest("button[data-sort]");
       if (!btn) return;

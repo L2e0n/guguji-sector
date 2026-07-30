@@ -111,32 +111,46 @@
     }
 
     .vol-pace-wrap {
-      margin-top: 4px;
+      margin-top: 6px;
       padding-top: 4px;
       border-top: 1px dashed #e6ebf2;
+      flex: 0 0 auto;
+      overflow: visible;
+      min-width: 0;
     }
     .vol-pace-head {
-      display: flex; justify-content: space-between; align-items: baseline;
+      display: flex; justify-content: space-between; align-items: baseline; gap: 6px;
       font-size: 11px; color: #666; margin-bottom: 2px;
     }
-    .vol-pace-head .subk { font-size: 10px; font-weight: 500; color: #999; }
-    .vol-pace-chart { position: relative; width: 100%; height: 56px; }
-    .vol-pace-chart canvas { width: 100%; height: 56px; display: block; }
+    .vol-pace-head .subk { font-size: 10px; font-weight: 500; color: #999; white-space: nowrap; }
+    .vol-pace-legend {
+      display: inline-flex; align-items: center; gap: 8px; font-size: 10px; color: #888;
+      margin-bottom: 2px;
+    }
+    .vol-pace-legend i {
+      display: inline-block; width: 10px; height: 2px; border-radius: 1px; vertical-align: middle; margin-right: 3px;
+    }
+    .vol-pace-legend .acc i { background: #c0392b; box-shadow: 0 0 0 2px rgba(192,57,43,0.12); }
+    .vol-pace-legend .dec i { background: #1e8449; box-shadow: 0 0 0 2px rgba(30,132,73,0.12); }
+    .vol-pace-chart { position: relative; width: 100%; height: 72px; overflow: visible; }
+    .vol-pace-chart canvas { width: 100%; height: 72px; display: block; }
     .vol-pace-empty {
       position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
       color: #aaa; font-size: 11px; pointer-events: none;
     }
     .vol-pace-foot {
-      margin-top: 2px;
+      margin-top: 3px;
       font-size: 10px;
       color: #666;
-      line-height: 1.25;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
+      line-height: 1.4;
+      white-space: normal;
+      overflow: visible;
+      word-break: break-word;
     }
     .vol-pace-foot .up { color: #c0392b; font-weight: 700; }
     .vol-pace-foot .down { color: #1e8449; font-weight: 700; }
+    .overview-card .vol-panel { overflow: visible; min-height: auto; }
+    .overview-card .vol-pace-wrap { flex: 0 0 auto; }
 
     .vol-vs-prev.expand { color: #c0392b; background: #fdecea; }
     .vol-vs-prev.shrink { color: #1e8449; background: #eafaf1; }
@@ -548,8 +562,13 @@
               <span>放缩速度</span>
               <span class="subk" id="volPaceMeta">亿/10分 · 0=不变</span>
             </div>
+            <div class="vol-pace-legend" id="volPaceLegend" title="同一条二阶速度在0轴上下分段着色：上=加速、下=减速">
+              <span class="acc"><i></i>加速</span>
+              <span class="dec"><i></i>减速</span>
+              <span style="color:#aaa">一条曲线·零轴上下</span>
+            </div>
             <div class="vol-pace-chart">
-              <canvas id="volPaceCanvas" height="56"></canvas>
+              <canvas id="volPaceCanvas" height="72"></canvas>
               <div class="vol-pace-empty" id="volPaceEmpty">等待分时路径…</div>
             </div>
             <div class="vol-pace-foot" id="volPaceFoot">—</div>
@@ -1911,12 +1930,14 @@ function renderDarkQuery(item, profile) {
       }
 
       // 放缩速度 = 放量/缩量差额的变化率（二阶）；纵轴 亿/10分钟，0=势头不变
+      // 视觉：同一条速度曲线，>0 红(加速)、<0 绿(减速) —— 不是两条独立业务线
       (function renderVolPace() {
         const canvas = $("volPaceCanvas");
         const empty = $("volPaceEmpty");
         const foot = $("volPaceFoot");
         const meta = $("volPaceMeta");
         if (!canvas) return;
+        const CH = 72;
         const pace = vol.vs_prev_pace || {};
         const rawPts = pace.points || [];
         const pts = rawPts.map(function (p) {
@@ -1930,7 +1951,7 @@ function renderDarkQuery(item, profile) {
 
         if (meta) {
           meta.textContent = pts.length
-            ? ("亿/10分 · 0=不变 · " + pts.length + "点")
+            ? ("亿/10分 · " + pts.length + "点")
             : "亿/10分 · 0=不变";
         }
 
@@ -1944,19 +1965,18 @@ function renderDarkQuery(item, profile) {
           if (ctx0) {
             const dpr0 = window.devicePixelRatio || 1;
             const w0 = canvas.clientWidth || 280;
-            const h0 = 56;
             canvas.width = Math.floor(w0 * dpr0);
-            canvas.height = Math.floor(h0 * dpr0);
+            canvas.height = Math.floor(CH * dpr0);
             ctx0.setTransform(dpr0, 0, 0, dpr0, 0, 0);
-            ctx0.clearRect(0, 0, w0, h0);
+            ctx0.clearRect(0, 0, w0, CH);
           }
           return;
         }
         if (empty) empty.style.display = "none";
 
         const dpr = window.devicePixelRatio || 1;
-        const cssW = canvas.clientWidth || 280;
-        const cssH = 56;
+        const cssW = Math.max(160, canvas.clientWidth || 280);
+        const cssH = CH;
         canvas.width = Math.floor(cssW * dpr);
         canvas.height = Math.floor(cssH * dpr);
         canvas.style.width = cssW + "px";
@@ -1965,24 +1985,23 @@ function renderDarkQuery(item, profile) {
         ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
         ctx.clearRect(0, 0, cssW, cssH);
 
-        const pad = { l: 28, r: 4, t: 4, b: 12 };
-        const W = cssW - pad.l - pad.r;
-        const H = cssH - pad.t - pad.b;
+        const pad = { l: 34, r: 6, t: 10, b: 16 };
+        const W = Math.max(10, cssW - pad.l - pad.r);
+        const H = Math.max(10, cssH - pad.t - pad.b);
         let ymin = 0, ymax = 0;
         pts.forEach(function (p) {
           const v = Number(p._spd);
           ymin = Math.min(ymin, v);
           ymax = Math.max(ymax, v);
         });
-        // always show zero baseline
         ymin = Math.min(ymin, -1);
         ymax = Math.max(ymax, 1);
-        let padY = Math.max(2, (ymax - ymin) * 0.12);
+        let padY = Math.max(2, (ymax - ymin) * 0.14);
         ymin -= padY;
         ymax += padY;
-        // tame open noise extremes for readability
         if (ymin < -120) ymin = -120;
         if (ymax > 120) ymax = 120;
+
         const xOf = function (i) {
           return pad.l + (pts.length === 1 ? W / 2 : (i / (pts.length - 1)) * W);
         };
@@ -1992,60 +2011,108 @@ function renderDarkQuery(item, profile) {
         const fmtSpd = function (v) {
           const n = Number(v);
           if (!Number.isFinite(n)) return "—";
-          const a = Math.abs(n);
-          const body = a >= 20 ? Math.round(n).toString() : n.toFixed(0);
-          return (n > 0 ? "+" : "") + body;
+          return (n > 0 ? "+" : "") + Math.round(n).toString();
         };
+
+        // build polyline with zero-crossing splits for dual-tone
+        const samples = [];
+        for (let i = 0; i < pts.length; i++) {
+          samples.push({ i: i, v: Number(pts[i]._spd), x: xOf(i), y: yOf(Number(pts[i]._spd)), t: pts[i].t || "" });
+          if (i < pts.length - 1) {
+            const v0 = Number(pts[i]._spd), v1 = Number(pts[i + 1]._spd);
+            if ((v0 > 0 && v1 < 0) || (v0 < 0 && v1 > 0)) {
+              const r = Math.abs(v0) / (Math.abs(v0) + Math.abs(v1));
+              const xz = xOf(i) + (xOf(i + 1) - xOf(i)) * r;
+              samples.push({ i: i + r, v: 0, x: xz, y: yOf(0), t: "", z: true });
+            }
+          }
+        }
 
         ctx.fillStyle = "#fcfdff";
         ctx.fillRect(0, 0, cssW, cssH);
 
-        // zero line = 势头不变
-        if (ymin < 0 && ymax > 0) {
-          ctx.strokeStyle = "#c5ccd6";
-          ctx.setLineDash([4, 3]);
+        // zero baseline
+        const y0 = yOf(0);
+        ctx.strokeStyle = "#c5ccd6";
+        ctx.lineWidth = 1;
+        ctx.setLineDash([4, 3]);
+        ctx.beginPath();
+        ctx.moveTo(pad.l, y0);
+        ctx.lineTo(pad.l + W, y0);
+        ctx.stroke();
+        ctx.setLineDash([]);
+        ctx.fillStyle = "#9aa3af";
+        ctx.font = "10px sans-serif";
+        ctx.textAlign = "left";
+        ctx.fillText("0", 4, y0 + 3);
+
+        // fill bands: above zero red (加速), below zero green (减速)
+        function fillBand(sign) {
           ctx.beginPath();
-          ctx.moveTo(pad.l, yOf(0));
-          ctx.lineTo(pad.l + W, yOf(0));
-          ctx.stroke();
-          ctx.setLineDash([]);
-          ctx.fillStyle = "#9aa3af";
-          ctx.font = "10px sans-serif";
-          ctx.textAlign = "left";
-          ctx.fillText("0", 4, yOf(0) + 3);
+          let started = false;
+          for (let k = 0; k < samples.length; k++) {
+            const s = samples[k];
+            const on = sign > 0 ? s.v >= 0 : s.v <= 0;
+            if (!on) {
+              if (started) {
+                ctx.lineTo(s.x, y0);
+                ctx.closePath();
+                ctx.fill();
+                started = false;
+                ctx.beginPath();
+              }
+              continue;
+            }
+            if (!started) {
+              ctx.moveTo(s.x, y0);
+              ctx.lineTo(s.x, s.y);
+              started = true;
+            } else {
+              ctx.lineTo(s.x, s.y);
+            }
+          }
+          if (started) {
+            const lastS = samples[samples.length - 1];
+            ctx.lineTo(lastS.x, y0);
+            ctx.closePath();
+            ctx.fill();
+          }
         }
+        ctx.fillStyle = "rgba(192,57,43,0.14)";
+        fillBand(1);
+        ctx.fillStyle = "rgba(30,132,73,0.14)";
+        fillBand(-1);
+
+        // stroke segments by sign
+        function strokeBand(sign, color) {
+          ctx.strokeStyle = color;
+          ctx.lineWidth = 1.9;
+          ctx.lineJoin = "round";
+          ctx.lineCap = "round";
+          ctx.beginPath();
+          let pen = false;
+          for (let k = 0; k < samples.length; k++) {
+            const s = samples[k];
+            const on = sign > 0 ? s.v >= 0 : s.v <= 0;
+            if (!on) { pen = false; continue; }
+            if (!pen) { ctx.moveTo(s.x, s.y); pen = true; }
+            else ctx.lineTo(s.x, s.y);
+          }
+          ctx.stroke();
+        }
+        strokeBand(1, "#c0392b");
+        strokeBand(-1, "#1e8449");
 
         const last = Number(pts[pts.length - 1]._spd);
         const col = last > 1.5 ? "#c0392b" : (last < -1.5 ? "#1e8449" : "#5d6d7e");
-
-        // fill to zero
-        ctx.beginPath();
-        pts.forEach(function (p, i) {
-          const x = xOf(i), y = yOf(Number(p._spd));
-          if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
-        });
-        ctx.lineTo(xOf(pts.length - 1), yOf(0));
-        ctx.lineTo(xOf(0), yOf(0));
-        ctx.closePath();
-        ctx.fillStyle = last >= 0 ? "rgba(192,57,43,0.10)" : "rgba(30,132,73,0.10)";
-        ctx.fill();
-
-        // line
-        ctx.beginPath();
-        pts.forEach(function (p, i) {
-          const x = xOf(i), y = yOf(Number(p._spd));
-          if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
-        });
-        ctx.strokeStyle = col;
-        ctx.lineWidth = 1.8;
-        ctx.lineJoin = "round";
-        ctx.stroke();
-
         const ex = xOf(pts.length - 1), ey = yOf(last);
         ctx.fillStyle = col;
         ctx.beginPath();
-        ctx.arc(ex, ey, 2.6, 0, Math.PI * 2);
+        ctx.arc(ex, ey, 2.8, 0, Math.PI * 2);
         ctx.fill();
+        ctx.strokeStyle = "#fff";
+        ctx.lineWidth = 1;
+        ctx.stroke();
 
         // x labels
         ctx.fillStyle = "#9aa3af";
@@ -2055,13 +2122,19 @@ function renderDarkQuery(item, profile) {
         const seen = {};
         labelIdx.forEach(function (i) {
           if (seen[i]) return; seen[i] = 1;
-          ctx.fillText(pts[i].t || "", xOf(i), cssH - 3);
+          const tx = xOf(i);
+          const label = pts[i].t || "";
+          if (!label) return;
+          // keep labels inside canvas
+          const clampedX = Math.min(cssW - 14, Math.max(pad.l, tx));
+          ctx.fillText(label, clampedX, cssH - 3);
         });
 
         // y labels
+        ctx.textAlign = "right";
+        ctx.fillText(fmtSpd(ymax), pad.l - 4, pad.t + 8);
+        ctx.fillText(fmtSpd(ymin), pad.l - 4, pad.t + H);
         ctx.textAlign = "left";
-        ctx.fillText(fmtSpd(ymax), 2, pad.t + 8);
-        ctx.fillText(fmtSpd(ymin), 2, pad.t + H);
 
         if (foot && latest) {
           const dYi = latest.delta_yi != null ? Number(latest.delta_yi) : NaN;
@@ -2071,7 +2144,7 @@ function renderDarkQuery(item, profile) {
             || (Number.isFinite(dYi) ? (dYi > 1 ? "放量" : (dYi < -1 ? "缩量" : "持平")) : "—");
           const speedLabel = latest.speed_label || (
             Number.isFinite(spdN)
-              ? (spdN > 1.5 ? "势头向上" : (spdN < -1.5 ? "势头向下" : "势头平稳"))
+              ? (spdN > 1.5 ? "加速" : (spdN < -1.5 ? "减速" : "平稳"))
               : "—"
           );
           const dCls = Number.isFinite(dYi) ? (dYi > 1 ? "up" : (dYi < -1 ? "down" : "")) : "";
@@ -2083,8 +2156,9 @@ function renderDarkQuery(item, profile) {
             ? ((spdN > 0 ? "+" : "") + spdN.toFixed(1) + "亿/10分")
             : "—";
           foot.innerHTML =
-            '<span class="' + dCls + '">' + levelLabel + dTxt + "</span>"
-            + ' · <span class="' + sCls + '">' + speedLabel + " " + sTxt + "</span>";
+            '<span class="' + dCls + '">' + levelLabel + " " + dTxt + "</span>"
+            + ' · <span class="' + sCls + '">' + speedLabel + " " + sTxt + "</span>"
+            + '<br><span style="color:#999">红=速度&gt;0加速 · 绿=速度&lt;0减速</span>';
         }
       })();
 

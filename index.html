@@ -109,6 +109,18 @@
       background: #f7f8fa; font-size: 13px; font-weight: 700;
       font-variant-numeric: tabular-nums; text-align: center;
     }
+
+    .vol-method {
+      margin-top: 6px;
+      font-size: 11px;
+      color: #888;
+      line-height: 1.4;
+    }
+    .vol-method b { color: #555; font-weight: 700; }
+    .vol-method .ok { color: #1e8449; font-weight: 700; }
+    .vol-method .warn { color: #b9770e; font-weight: 700; }
+    .vol-method .bad { color: #c0392b; font-weight: 700; }
+
     .vol-vs-prev.expand { color: #c0392b; background: #fdecea; }
     .vol-vs-prev.shrink { color: #1e8449; background: #eafaf1; }
     .vol-vs-prev.flat { color: #666; }
@@ -430,7 +442,21 @@
     .overview-card .section-title { font-size: 15px; }
     .overview-card .section-title .hint { font-size: 12px; }
     .query-card .name { font-size: 18px; }
-  </style>
+  
+    .query-card-toolbar {
+      display: flex; align-items: center; justify-content: space-between; gap: 8px;
+      margin-bottom: 8px;
+    }
+    .query-card-toolbar .q-title {
+      font-size: 12px; color: #888; font-weight: 700;
+    }
+    .btn.ghost {
+      background: #fff; color: #666; border: 1px solid #e6e6e6;
+      box-shadow: none;
+    }
+    .btn.ghost:hover { border-color: #ccc; color: #333; background: #fafafa; }
+    .btn.ghost:disabled { opacity: .45; cursor: not-allowed; }
+</style>
 </head>
 <body>
   <div class="app">
@@ -500,6 +526,7 @@
             </tbody>
           </table>
           <div id="volVsPrev" class="vol-vs-prev">较昨日量能：—</div>
+          <div id="volMethod" class="vol-method">预测算法：—</div>
         </div>
         <div class="market-panel">
           <h3>
@@ -580,7 +607,7 @@
 
     <div class="footer-note">
       数据来源：东方财富板块资金流 / 指数成交额 / 涨跌停池 · 盘中约每 12–15 秒缓存<br />
-      预测量能=按近几日同时刻成交占比曲线外推（缺历史时回退线性）；涨跌停已剔除 ST；资金结构=订单规模代理+北向通道。信号仅供观察，不构成投资建议
+      预测量能=按近几日同时刻成交占比曲线外推（无曲线不预测；东财失败→本地last-good/问财备份金额）；涨跌停已剔除 ST；资金结构=订单规模代理+北向通道。信号仅供观察，不构成投资建议
     </div>
 
     </div><!-- /pageSector -->
@@ -604,6 +631,7 @@
         <div class="search-row">
           <input id="darkQueryInput" type="search" placeholder="输入股票名称或代码" autocomplete="off" />
           <button id="darkQueryBtn" class="btn" type="button">查询</button>
+          <button id="darkQueryClearBtn" class="btn ghost" type="button" title="取消个股显示" disabled>取消显示</button>
         </div>
         <div id="darkQueryResult" class="query-card" style="margin-top:12px"></div>
       </div>
@@ -649,6 +677,8 @@
       darkOpenCode: null,
       darkMaxAbs: 1,
       _darkLast: null,
+      darkQueryActive: false,
+      _darkQueryLast: null,
       trendLimit: 10,
       _marketLast: null,
       trendHidden: {},
@@ -1158,19 +1188,59 @@
         </div>`;
     }
 
-    function renderDarkQuery(item, profile) {
+    
+    function setDarkQueryClearEnabled(on) {
+      const btn = $("darkQueryClearBtn");
+      if (btn) btn.disabled = !on;
+    }
+
+    function clearDarkQuery(opts) {
+      const clearInput = !opts || opts.clearInput !== false;
       const box = $("darkQueryResult");
+      if (box) box.innerHTML = "";
+      if (clearInput) {
+        const input = $("darkQueryInput");
+        if (input) {
+          input.value = "";
+          input.focus();
+        }
+      }
+      state.darkQueryActive = false;
+      state._darkQueryLast = null;
+      setDarkQueryClearEnabled(false);
+      const st = $("darkStatusText");
+      if (st && /个股|查询/.test(st.textContent || "")) {
+        st.textContent = "已取消个股显示";
+      }
+    }
+
+function renderDarkQuery(item, profile) {
+      const box = $("darkQueryResult");
+      const toolbar = `
+        <div class="query-card-toolbar">
+          <span class="q-title">个股暗盘结果</span>
+          <button type="button" class="btn ghost" id="darkQueryCancelInCard" title="取消个股显示">✕ 取消显示</button>
+        </div>`;
+      const bindCancel = () => {
+        const b = $("darkQueryCancelInCard");
+        if (b) b.addEventListener("click", () => clearDarkQuery({ clearInput: true }));
+        state.darkQueryActive = true;
+        state._darkQueryLast = { item, profile };
+        setDarkQueryClearEnabled(true);
+      };
       if (!item) {
         // 无暗盘时仍可展示资金成分
         if (profile && profile.ok) {
-          box.innerHTML = `<div class="row open" style="cursor:default"><div class="row-top"><div><span class="name">${profile.name || "-"}</span><span class="code">${profile.code || ""}</span></div></div><div class="detail">${renderProfileBlock(profile)}</div></div>`;
+          box.innerHTML = toolbar + `<div class="row open" style="cursor:default"><div class="row-top"><div><span class="name">${profile.name || "-"}</span><span class="code">${profile.code || ""}</span></div></div><div class="detail">${renderProfileBlock(profile)}</div></div>`;
+          bindCancel();
           return;
         }
-        box.innerHTML = '<div class="empty">未查到该股票的暗盘数据</div>';
+        box.innerHTML = toolbar + '<div class="empty">未查到该股票的暗盘数据</div>';
+        bindCancel();
         return;
       }
       const sig = item.signal || {};
-      box.innerHTML = `
+      box.innerHTML = toolbar + `
         <div class="row open" style="cursor:default">
           <div class="row-top">
             <div>
@@ -1197,6 +1267,7 @@
             ${renderProfileBlock(profile)}
           </div>
         </div>`;
+      bindCancel();
     }
 
     function renderDarkList(items) {
@@ -1260,11 +1331,21 @@
     async function queryDark() {
       const q = ($("darkQueryInput").value || "").trim();
       if (!q) {
-        $("darkQueryResult").innerHTML = '<div class="empty">请输入股票名称或代码</div>';
+        $("darkQueryResult").innerHTML = '<div class="query-card-toolbar"><span class="q-title">个股暗盘结果</span><button type="button" class="btn ghost" id="darkQueryCancelInCard" title="取消个股显示">✕ 取消显示</button></div><div class="empty">请输入股票名称或代码</div>';
+        const tipCancel = $("darkQueryCancelInCard");
+        if (tipCancel) tipCancel.addEventListener("click", () => clearDarkQuery({ clearInput: true }));
+        setDarkQueryClearEnabled(true);
+        state.darkQueryActive = true;
         return;
       }
       $("darkQueryBtn").disabled = true;
-      $("darkQueryResult").innerHTML = '<div class="empty">查询中…</div>';
+      $("darkQueryResult").innerHTML = '<div class="query-card-toolbar"><span class="q-title">个股暗盘结果</span><button type="button" class="btn ghost" id="darkQueryCancelInCard" title="取消个股显示">✕ 取消显示</button></div><div class="empty">查询中…</div>';
+      {
+        const loadingCancel = $("darkQueryCancelInCard");
+        if (loadingCancel) loadingCancel.addEventListener("click", () => clearDarkQuery({ clearInput: true }));
+        setDarkQueryClearEnabled(true);
+        state.darkQueryActive = true;
+      }
       try {
         const data = await fetchJson(`${API_BASE}/api/dark/query?q=${encodeURIComponent(q)}`, FETCH_DEFAULTS.query);
         if (!data.ok) throw new Error(data.error || "查询失败");
@@ -1273,7 +1354,11 @@
           $("darkAsofText").textContent = `数据时点：${data.asof_day || data.asof}`;
         }
       } catch (e) {
-        $("darkQueryResult").innerHTML = `<div class="empty">查询失败：${e.message || e}</div>`;
+        $("darkQueryResult").innerHTML = `<div class="query-card-toolbar"><span class="q-title">个股暗盘结果</span><button type="button" class="btn ghost" id="darkQueryCancelInCard">✕ 取消显示</button></div><div class="empty">查询失败：${e.message || e}</div>`;
+        const cb = $("darkQueryCancelInCard");
+        if (cb) cb.addEventListener("click", () => clearDarkQuery({ clearInput: true }));
+        setDarkQueryClearEnabled(true);
+        state.darkQueryActive = true;
       } finally {
         $("darkQueryBtn").disabled = false;
       }
@@ -1734,7 +1819,17 @@
       const vol = data.volume || {};
       const sess = data.session || {};
       const prog = sess.progress_pct != null ? sess.progress_pct + "%" : "-";
-      $("volMeta").textContent = (prog && prog !== "-" ? ("进度" + prog + " · ") : "") + "亿元";
+      $("volMeta").textContent = (function(){
+        const total = (data.volume || {}).total || {};
+        const method = total.predict_method || (data.volume || {}).predict_method || "";
+        const mins = (data.volume || {}).profile_minutes;
+        const bits = [];
+        if (prog && prog !== "-") bits.push("进度" + prog);
+        if (method) bits.push(method);
+        if (mins != null && mins !== "") bits.push(mins + "m");
+        bits.push("亿元");
+        return bits.join(" · ");
+      })();
 
       const rows = [
         { name: "上证", x: vol.sh, strong: false, indent: false },
@@ -1786,6 +1881,35 @@
           vsEl.textContent = "较昨日量能：—";
         }
       }
+
+
+      // 预测算法标注：profile / unavailable / closed
+      (function () {
+        const methodEl = $("volMethod");
+        if (!methodEl) return;
+        const total = vol.total || {};
+        const hs = vol.hs || {};
+        const method = (total.predict_method || hs.predict_method || vol.predict_method || "—");
+        const mins = vol.profile_minutes;
+        const psrc = vol.profile_source || "";
+        const asrc = vol.amount_source || "";
+        const conf = vol.predict_confidence || "";
+        const ratio = total.profile_ratio != null ? total.profile_ratio : hs.profile_ratio;
+        let cls = "warn";
+        let methodLabel = String(method);
+        if (method === "profile") { cls = "ok"; methodLabel = "量能曲线 profile"; }
+        else if (method === "closed") { cls = "ok"; methodLabel = "收盘 closed"; }
+        else if (method === "unavailable" || method === "none") { cls = "bad"; methodLabel = "不可用(无曲线)"; }
+        else if (method === "linear") { cls = "bad"; methodLabel = "线性(已废弃)"; }
+        const parts = [];
+        parts.push("预测算法：<span class='" + cls + "'>" + methodLabel + "</span>");
+        if (mins != null && mins !== "") parts.push("曲线 " + mins + "m");
+        if (psrc) parts.push("曲线源 " + psrc);
+        if (asrc) parts.push("金额源 " + asrc);
+        if (ratio != null) parts.push("占比 " + (Number(ratio) * 100).toFixed(1) + "%");
+        if (conf) parts.push("置信 " + conf);
+        methodEl.innerHTML = parts.join(" · ");
+      })();
 
       const lim = data.limit || {};
       const sum = lim.summary || {};
@@ -1883,8 +2007,10 @@
     });
     $("darkRefreshBtn").addEventListener("click", () => refreshDark(true));
     $("darkQueryBtn").addEventListener("click", () => queryDark());
+    $("darkQueryClearBtn").addEventListener("click", () => clearDarkQuery({ clearInput: true }));
     $("darkQueryInput").addEventListener("keydown", (e) => {
       if (e.key === "Enter") queryDark();
+      if (e.key === "Escape") clearDarkQuery({ clearInput: true });
     });
 
     $("typeSeg").addEventListener("click", (e) => {

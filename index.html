@@ -111,26 +111,29 @@
     }
 
     .vol-pace-wrap {
-      margin-top: 8px;
-      padding: 6px 8px 4px;
-      border-radius: 8px;
-      background: #fbfcfe;
-      border: 1px solid #eef1f5;
+      margin-top: 4px;
+      padding-top: 4px;
+      border-top: 1px dashed #e6ebf2;
     }
     .vol-pace-head {
       display: flex; justify-content: space-between; align-items: baseline;
-      font-size: 12px; font-weight: 700; color: #444; margin-bottom: 2px;
+      font-size: 11px; color: #666; margin-bottom: 2px;
     }
     .vol-pace-head .subk { font-size: 10px; font-weight: 500; color: #999; }
-    .vol-pace-chart { position: relative; width: 100%; height: 84px; }
-    .vol-pace-chart canvas { width: 100%; height: 84px; display: block; }
+    .vol-pace-chart { position: relative; width: 100%; height: 56px; }
+    .vol-pace-chart canvas { width: 100%; height: 56px; display: block; }
     .vol-pace-empty {
       position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
       color: #aaa; font-size: 11px; pointer-events: none;
     }
     .vol-pace-foot {
-      margin-top: 2px; font-size: 11px; color: #666; text-align: center;
-      font-variant-numeric: tabular-nums; min-height: 16px;
+      margin-top: 2px;
+      font-size: 10px;
+      color: #666;
+      line-height: 1.25;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
     }
     .vol-pace-foot .up { color: #c0392b; font-weight: 700; }
     .vol-pace-foot .down { color: #1e8449; font-weight: 700; }
@@ -543,10 +546,10 @@
           <div class="vol-pace-wrap">
             <div class="vol-pace-head">
               <span>放缩速度</span>
-              <span class="subk" id="volPaceMeta">二阶 · 亿/10分 · 0=势头不变</span>
+              <span class="subk" id="volPaceMeta">亿/10分 · 0=不变</span>
             </div>
             <div class="vol-pace-chart">
-              <canvas id="volPaceCanvas" height="84"></canvas>
+              <canvas id="volPaceCanvas" height="56"></canvas>
               <div class="vol-pace-empty" id="volPaceEmpty">等待分时路径…</div>
             </div>
             <div class="vol-pace-foot" id="volPaceFoot">—</div>
@@ -1927,8 +1930,8 @@ function renderDarkQuery(item, profile) {
 
         if (meta) {
           meta.textContent = pts.length
-            ? ("二阶 · 亿/10分 · 0=势头不变 · " + pts.length + "点")
-            : "二阶 · 亿/10分 · 0=势头不变";
+            ? ("亿/10分 · 0=不变 · " + pts.length + "点")
+            : "亿/10分 · 0=不变";
         }
 
         if (!pts.length) {
@@ -1941,7 +1944,7 @@ function renderDarkQuery(item, profile) {
           if (ctx0) {
             const dpr0 = window.devicePixelRatio || 1;
             const w0 = canvas.clientWidth || 280;
-            const h0 = 84;
+            const h0 = 56;
             canvas.width = Math.floor(w0 * dpr0);
             canvas.height = Math.floor(h0 * dpr0);
             ctx0.setTransform(dpr0, 0, 0, dpr0, 0, 0);
@@ -1953,7 +1956,7 @@ function renderDarkQuery(item, profile) {
 
         const dpr = window.devicePixelRatio || 1;
         const cssW = canvas.clientWidth || 280;
-        const cssH = 84;
+        const cssH = 56;
         canvas.width = Math.floor(cssW * dpr);
         canvas.height = Math.floor(cssH * dpr);
         canvas.style.width = cssW + "px";
@@ -1962,7 +1965,7 @@ function renderDarkQuery(item, profile) {
         ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
         ctx.clearRect(0, 0, cssW, cssH);
 
-        const pad = { l: 34, r: 8, t: 8, b: 16 };
+        const pad = { l: 28, r: 4, t: 4, b: 12 };
         const W = cssW - pad.l - pad.r;
         const H = cssH - pad.t - pad.b;
         let ymin = 0, ymax = 0;
@@ -2080,8 +2083,8 @@ function renderDarkQuery(item, profile) {
             ? ((spdN > 0 ? "+" : "") + spdN.toFixed(1) + "亿/10分")
             : "—";
           foot.innerHTML =
-            '一阶<span class="' + dCls + '">' + levelLabel + " " + dTxt + "</span>"
-            + ' · 二阶<span class="' + sCls + '">' + speedLabel + " " + sTxt + "</span>";
+            '<span class="' + dCls + '">' + levelLabel + dTxt + "</span>"
+            + ' · <span class="' + sCls + '">' + speedLabel + " " + sTxt + "</span>";
         }
       })();
 

@@ -110,16 +110,30 @@
       font-variant-numeric: tabular-nums; text-align: center;
     }
 
-    .vol-method {
-      margin-top: 6px;
-      font-size: 11px;
-      color: #888;
-      line-height: 1.4;
+    .vol-pace-wrap {
+      margin-top: 8px;
+      padding: 6px 8px 4px;
+      border-radius: 8px;
+      background: #fbfcfe;
+      border: 1px solid #eef1f5;
     }
-    .vol-method b { color: #555; font-weight: 700; }
-    .vol-method .ok { color: #1e8449; font-weight: 700; }
-    .vol-method .warn { color: #b9770e; font-weight: 700; }
-    .vol-method .bad { color: #c0392b; font-weight: 700; }
+    .vol-pace-head {
+      display: flex; justify-content: space-between; align-items: baseline;
+      font-size: 12px; font-weight: 700; color: #444; margin-bottom: 2px;
+    }
+    .vol-pace-head .subk { font-size: 10px; font-weight: 500; color: #999; }
+    .vol-pace-chart { position: relative; width: 100%; height: 84px; }
+    .vol-pace-chart canvas { width: 100%; height: 84px; display: block; }
+    .vol-pace-empty {
+      position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+      color: #aaa; font-size: 11px; pointer-events: none;
+    }
+    .vol-pace-foot {
+      margin-top: 2px; font-size: 11px; color: #666; text-align: center;
+      font-variant-numeric: tabular-nums; min-height: 16px;
+    }
+    .vol-pace-foot .up { color: #c0392b; font-weight: 700; }
+    .vol-pace-foot .down { color: #1e8449; font-weight: 700; }
 
     .vol-vs-prev.expand { color: #c0392b; background: #fdecea; }
     .vol-vs-prev.shrink { color: #1e8449; background: #eafaf1; }
@@ -526,7 +540,17 @@
             </tbody>
           </table>
           <div id="volVsPrev" class="vol-vs-prev">较昨日量能：—</div>
-          <div id="volMethod" class="vol-method">预测算法：—</div>
+          <div class="vol-pace-wrap">
+            <div class="vol-pace-head">
+              <span>放缩速度</span>
+              <span class="subk" id="volPaceMeta">较昨推全天 · 亿</span>
+            </div>
+            <div class="vol-pace-chart">
+              <canvas id="volPaceCanvas" height="84"></canvas>
+              <div class="vol-pace-empty" id="volPaceEmpty">等待分时路径…</div>
+            </div>
+            <div class="vol-pace-foot" id="volPaceFoot">—</div>
+          </div>
         </div>
         <div class="market-panel">
           <h3>
@@ -1874,42 +1898,172 @@ function renderDarkQuery(item, profile) {
           const dir = vs.direction || "";
           if (dir) vsEl.classList.add(dir);
           const sign = Number(dYi) > 0 ? "+" : (Number(dYi) < 0 ? "-" : "");
-          const basisHint = vs.basis && String(vs.basis).indexOf("predict") === 0 ? "预测" : "实际";
+          // basisHint is about TODAY's ref (predict vs actual), NOT yesterday.
+          // Yesterday amount is always realized full-day turnover.
+          const todayHint = vs.basis && String(vs.basis).indexOf("predict") === 0 ? "今预测" : "今实际";
           vsEl.textContent = "较昨日" + lab + " " + sign + absTxt + "亿"
-            + (prevYi != null ? "（昨" + Number(prevYi).toFixed(0) + "亿" + (prevDay ? " " + prevDay.slice(5) : "") + " · " + basisHint + "）" : "");
+            + (prevYi != null ? "（昨实际" + Number(prevYi).toFixed(0) + "亿" + (prevDay ? " " + prevDay.slice(5) : "") + " · " + todayHint + "）" : "");
         } else {
           vsEl.textContent = "较昨日量能：—";
         }
       }
 
+      // 放量/缩量速度时序（较昨推全天 delta）
+      (function renderVolPace() {
+        const canvas = $("volPaceCanvas");
+        const empty = $("volPaceEmpty");
+        const foot = $("volPaceFoot");
+        const meta = $("volPaceMeta");
+        if (!canvas) return;
+        const pace = vol.vs_prev_pace || {};
+        const pts = (pace.points || []).filter(function (p) {
+          return p && p.delta_yi != null && Number.isFinite(Number(p.delta_yi));
+        });
+        const latest = pace.latest || (pts.length ? pts[pts.length - 1] : null);
 
-      // 预测算法标注：profile / unavailable / closed
-      (function () {
-        const methodEl = $("volMethod");
-        if (!methodEl) return;
-        const total = vol.total || {};
-        const hs = vol.hs || {};
-        const method = (total.predict_method || hs.predict_method || vol.predict_method || "—");
-        const mins = vol.profile_minutes;
-        const psrc = vol.profile_source || "";
-        const asrc = vol.amount_source || "";
-        const conf = vol.predict_confidence || "";
-        const ratio = total.profile_ratio != null ? total.profile_ratio : hs.profile_ratio;
-        let cls = "warn";
-        let methodLabel = String(method);
-        if (method === "profile") { cls = "ok"; methodLabel = "量能曲线 profile"; }
-        else if (method === "closed") { cls = "ok"; methodLabel = "收盘 closed"; }
-        else if (method === "unavailable" || method === "none") { cls = "bad"; methodLabel = "不可用(无曲线)"; }
-        else if (method === "linear") { cls = "bad"; methodLabel = "线性(已废弃)"; }
-        const parts = [];
-        parts.push("预测算法：<span class='" + cls + "'>" + methodLabel + "</span>");
-        if (mins != null && mins !== "") parts.push("曲线 " + mins + "m");
-        if (psrc) parts.push("曲线源 " + psrc);
-        if (asrc) parts.push("金额源 " + asrc);
-        if (ratio != null) parts.push("占比 " + (Number(ratio) * 100).toFixed(1) + "%");
-        if (conf) parts.push("置信 " + conf);
-        methodEl.innerHTML = parts.join(" · ");
+        if (meta) {
+          meta.textContent = pts.length
+            ? ("较昨推全天 · " + pts.length + "点")
+            : "较昨推全天 · 亿";
+        }
+
+        if (!pts.length) {
+          if (empty) {
+            empty.style.display = "flex";
+            empty.textContent = "等待分时路径…";
+          }
+          if (foot) foot.textContent = "—";
+          const ctx0 = canvas.getContext("2d");
+          if (ctx0) {
+            const dpr0 = window.devicePixelRatio || 1;
+            const w0 = canvas.clientWidth || 280;
+            const h0 = 84;
+            canvas.width = Math.floor(w0 * dpr0);
+            canvas.height = Math.floor(h0 * dpr0);
+            ctx0.setTransform(dpr0, 0, 0, dpr0, 0, 0);
+            ctx0.clearRect(0, 0, w0, h0);
+          }
+          return;
+        }
+        if (empty) empty.style.display = "none";
+
+        const dpr = window.devicePixelRatio || 1;
+        const cssW = canvas.clientWidth || 280;
+        const cssH = 84;
+        canvas.width = Math.floor(cssW * dpr);
+        canvas.height = Math.floor(cssH * dpr);
+        canvas.style.width = cssW + "px";
+        canvas.style.height = cssH + "px";
+        const ctx = canvas.getContext("2d");
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        ctx.clearRect(0, 0, cssW, cssH);
+
+        const pad = { l: 28, r: 8, t: 8, b: 16 };
+        const W = cssW - pad.l - pad.r;
+        const H = cssH - pad.t - pad.b;
+        let ymin = 0, ymax = 0;
+        pts.forEach(function (p) {
+          const v = Number(p.delta_yi);
+          ymin = Math.min(ymin, v);
+          ymax = Math.max(ymax, v);
+        });
+        if (ymin === ymax) { ymin -= 10; ymax += 10; }
+        const padY = Math.max(5, (ymax - ymin) * 0.12);
+        ymin -= padY; ymax += padY;
+        const xOf = function (i) {
+          return pad.l + (pts.length === 1 ? W / 2 : (i / (pts.length - 1)) * W);
+        };
+        const yOf = function (v) {
+          return pad.t + (1 - (v - ymin) / (ymax - ymin)) * H;
+        };
+
+        // bg
+        ctx.fillStyle = "#fcfdff";
+        ctx.fillRect(0, 0, cssW, cssH);
+
+        // zero line
+        if (ymin < 0 && ymax > 0) {
+          ctx.strokeStyle = "#c5ccd6";
+          ctx.setLineDash([4, 3]);
+          ctx.beginPath();
+          ctx.moveTo(pad.l, yOf(0));
+          ctx.lineTo(pad.l + W, yOf(0));
+          ctx.stroke();
+          ctx.setLineDash([]);
+          ctx.fillStyle = "#9aa3af";
+          ctx.font = "10px sans-serif";
+          ctx.textAlign = "left";
+          ctx.fillText("0", 4, yOf(0) + 3);
+        }
+
+        const last = Number(pts[pts.length - 1].delta_yi);
+        const col = last > 1 ? "#c0392b" : (last < -1 ? "#1e8449" : "#5d6d7e");
+
+        // soft fill to zero
+        ctx.beginPath();
+        pts.forEach(function (p, i) {
+          const x = xOf(i), y = yOf(Number(p.delta_yi));
+          if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+        });
+        ctx.lineTo(xOf(pts.length - 1), yOf(0));
+        ctx.lineTo(xOf(0), yOf(0));
+        ctx.closePath();
+        ctx.fillStyle = last >= 0 ? "rgba(192,57,43,0.10)" : "rgba(30,132,73,0.10)";
+        ctx.fill();
+
+        // line on top
+        ctx.beginPath();
+        pts.forEach(function (p, i) {
+          const x = xOf(i), y = yOf(Number(p.delta_yi));
+          if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+        });
+        ctx.strokeStyle = col;
+        ctx.lineWidth = 1.8;
+        ctx.lineJoin = "round";
+        ctx.stroke();
+
+        // end point
+        const ex = xOf(pts.length - 1), ey = yOf(last);
+        ctx.fillStyle = col;
+        ctx.beginPath();
+        ctx.arc(ex, ey, 2.6, 0, Math.PI * 2);
+        ctx.fill();
+
+        // x labels
+        ctx.fillStyle = "#9aa3af";
+        ctx.font = "10px sans-serif";
+        ctx.textAlign = "center";
+        const labelIdx = [0, Math.floor((pts.length - 1) / 2), pts.length - 1];
+        const seen = {};
+        labelIdx.forEach(function (i) {
+          if (seen[i]) return; seen[i] = 1;
+          const t = pts[i].t || "";
+          ctx.fillText(t, xOf(i), cssH - 3);
+        });
+
+        // y max label
+        ctx.textAlign = "left";
+        ctx.fillText((ymax >= 0 ? "+" : "") + Math.round(ymax), 2, pad.t + 8);
+        ctx.fillText((ymin >= 0 ? "+" : "") + Math.round(ymin), 2, pad.t + H);
+
+        if (foot && latest) {
+          const dYi = Number(latest.delta_yi);
+          const paceN = latest.pace != null ? Number(latest.pace) : null;
+          const spd = latest.speed_yi_10m != null ? Number(latest.speed_yi_10m) : null;
+          const dCls = dYi > 1 ? "up" : (dYi < -1 ? "down" : "");
+          const sCls = spd != null ? (spd > 0.5 ? "up" : (spd < -0.5 ? "down" : "")) : "";
+          const dTxt = (dYi > 0 ? "+" : "") + dYi.toFixed(0) + "亿";
+          const pTxt = paceN != null ? (paceN * 100).toFixed(1) + "%" : "—";
+          const sTxt = spd == null || !Number.isFinite(spd)
+            ? "—"
+            : ((spd > 0 ? "+" : "") + spd.toFixed(1) + "亿/10分");
+          foot.innerHTML =
+            '当前<span class="' + dCls + '">' + dTxt + "</span>"
+            + " · 相对昨" + pTxt
+            + ' · 速度<span class="' + sCls + '">' + sTxt + "</span>";
+        }
       })();
+
 
       const lim = data.limit || {};
       const sum = lim.summary || {};

@@ -543,7 +543,7 @@
           <div class="vol-pace-wrap">
             <div class="vol-pace-head">
               <span>放缩速度</span>
-              <span class="subk" id="volPaceMeta">较昨比例 · 1.0=持平</span>
+              <span class="subk" id="volPaceMeta">二阶 · 亿/10分 · 0=势头不变</span>
             </div>
             <div class="vol-pace-chart">
               <canvas id="volPaceCanvas" height="84"></canvas>
@@ -1907,7 +1907,7 @@ function renderDarkQuery(item, profile) {
         }
       }
 
-      // 放量/缩量比例时序（较昨推全天 pace，1.0=持平）
+      // 放缩速度 = 放量/缩量差额的变化率（二阶）；纵轴 亿/10分钟，0=势头不变
       (function renderVolPace() {
         const canvas = $("volPaceCanvas");
         const empty = $("volPaceEmpty");
@@ -1915,40 +1915,26 @@ function renderDarkQuery(item, profile) {
         const meta = $("volPaceMeta");
         if (!canvas) return;
         const pace = vol.vs_prev_pace || {};
-        const pts = (pace.points || []).filter(function (p) {
-          if (!p) return false;
-          const r = p.pace != null ? Number(p.pace) : NaN;
-          if (Number.isFinite(r) && r > 0) return true;
-          // fallback: derive ratio from delta/prev if needed
-          if (p.delta_yi != null && p.prev_yi != null) return true;
-          if (p.delta_yi != null && pace.latest && pace.latest.prev_yi != null) return true;
-          return false;
-        }).map(function (p) {
-          let r = p.pace != null ? Number(p.pace) : NaN;
-          if (!Number.isFinite(r) || r <= 0) {
-            const prevYi = p.prev_yi != null ? Number(p.prev_yi)
-              : (pace.latest && pace.latest.prev_yi != null ? Number(pace.latest.prev_yi) : NaN);
-            const dYi = p.delta_yi != null ? Number(p.delta_yi) : NaN;
-            if (Number.isFinite(prevYi) && prevYi > 0 && Number.isFinite(dYi)) {
-              r = (prevYi + dYi) / prevYi;
-            }
-          }
-          return Object.assign({}, p, { _ratio: r });
-        }).filter(function (p) {
-          return Number.isFinite(p._ratio) && p._ratio > 0;
-        });
+        const rawPts = pace.points || [];
+        const pts = rawPts.map(function (p) {
+          if (!p) return null;
+          let spd = p.speed_smooth_yi_10m != null ? Number(p.speed_smooth_yi_10m)
+            : (p.speed_yi_10m != null ? Number(p.speed_yi_10m) : NaN);
+          if (!Number.isFinite(spd)) return null;
+          return Object.assign({}, p, { _spd: spd });
+        }).filter(Boolean);
         const latest = pace.latest || (pts.length ? pts[pts.length - 1] : null);
 
         if (meta) {
           meta.textContent = pts.length
-            ? ("较昨比例 · " + pts.length + "点 · 1.0=持平")
-            : "较昨比例 · 1.0=持平";
+            ? ("二阶 · 亿/10分 · 0=势头不变 · " + pts.length + "点")
+            : "二阶 · 亿/10分 · 0=势头不变";
         }
 
         if (!pts.length) {
           if (empty) {
             empty.style.display = "flex";
-            empty.textContent = "等待分时路径…";
+            empty.textContent = "等待速度序列…";
           }
           if (foot) foot.textContent = "—";
           const ctx0 = canvas.getContext("2d");
@@ -1976,78 +1962,75 @@ function renderDarkQuery(item, profile) {
         ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
         ctx.clearRect(0, 0, cssW, cssH);
 
-        const pad = { l: 32, r: 8, t: 8, b: 16 };
+        const pad = { l: 34, r: 8, t: 8, b: 16 };
         const W = cssW - pad.l - pad.r;
         const H = cssH - pad.t - pad.b;
-        let ymin = 1, ymax = 1;
+        let ymin = 0, ymax = 0;
         pts.forEach(function (p) {
-          const v = Number(p._ratio);
+          const v = Number(p._spd);
           ymin = Math.min(ymin, v);
           ymax = Math.max(ymax, v);
         });
-        // keep 1.0 baseline in view; avoid flat scale
-        ymin = Math.min(ymin, 0.98);
-        ymax = Math.max(ymax, 1.02);
-        // symmetric-ish padding around data
-        let padY = Math.max(0.01, (ymax - ymin) * 0.15);
+        // always show zero baseline
+        ymin = Math.min(ymin, -1);
+        ymax = Math.max(ymax, 1);
+        let padY = Math.max(2, (ymax - ymin) * 0.12);
         ymin -= padY;
         ymax += padY;
-        // clamp extreme early noise for readability
-        if (ymin < 0.6) ymin = 0.6;
-        if (ymax > 1.6) ymax = 1.6;
-        if (ymax - ymin < 0.04) {
-          const mid = (ymin + ymax) / 2;
-          ymin = mid - 0.02;
-          ymax = mid + 0.02;
-        }
+        // tame open noise extremes for readability
+        if (ymin < -120) ymin = -120;
+        if (ymax > 120) ymax = 120;
         const xOf = function (i) {
           return pad.l + (pts.length === 1 ? W / 2 : (i / (pts.length - 1)) * W);
         };
         const yOf = function (v) {
           return pad.t + (1 - (v - ymin) / (ymax - ymin)) * H;
         };
-        const fmtRatio = function (v) {
-          return (Number(v) * 100).toFixed(0) + "%";
+        const fmtSpd = function (v) {
+          const n = Number(v);
+          if (!Number.isFinite(n)) return "—";
+          const a = Math.abs(n);
+          const body = a >= 20 ? Math.round(n).toString() : n.toFixed(0);
+          return (n > 0 ? "+" : "") + body;
         };
 
-        // bg
         ctx.fillStyle = "#fcfdff";
         ctx.fillRect(0, 0, cssW, cssH);
 
-        // baseline 1.0 = 持平
-        if (ymin < 1 && ymax > 1) {
+        // zero line = 势头不变
+        if (ymin < 0 && ymax > 0) {
           ctx.strokeStyle = "#c5ccd6";
           ctx.setLineDash([4, 3]);
           ctx.beginPath();
-          ctx.moveTo(pad.l, yOf(1));
-          ctx.lineTo(pad.l + W, yOf(1));
+          ctx.moveTo(pad.l, yOf(0));
+          ctx.lineTo(pad.l + W, yOf(0));
           ctx.stroke();
           ctx.setLineDash([]);
           ctx.fillStyle = "#9aa3af";
           ctx.font = "10px sans-serif";
           ctx.textAlign = "left";
-          ctx.fillText("100%", 2, yOf(1) + 3);
+          ctx.fillText("0", 4, yOf(0) + 3);
         }
 
-        const last = Number(pts[pts.length - 1]._ratio);
-        const col = last > 1.005 ? "#c0392b" : (last < 0.995 ? "#1e8449" : "#5d6d7e");
+        const last = Number(pts[pts.length - 1]._spd);
+        const col = last > 1.5 ? "#c0392b" : (last < -1.5 ? "#1e8449" : "#5d6d7e");
 
-        // soft fill to 1.0 baseline
+        // fill to zero
         ctx.beginPath();
         pts.forEach(function (p, i) {
-          const x = xOf(i), y = yOf(Number(p._ratio));
+          const x = xOf(i), y = yOf(Number(p._spd));
           if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
         });
-        ctx.lineTo(xOf(pts.length - 1), yOf(1));
-        ctx.lineTo(xOf(0), yOf(1));
+        ctx.lineTo(xOf(pts.length - 1), yOf(0));
+        ctx.lineTo(xOf(0), yOf(0));
         ctx.closePath();
-        ctx.fillStyle = last >= 1 ? "rgba(192,57,43,0.10)" : "rgba(30,132,73,0.10)";
+        ctx.fillStyle = last >= 0 ? "rgba(192,57,43,0.10)" : "rgba(30,132,73,0.10)";
         ctx.fill();
 
-        // line on top
+        // line
         ctx.beginPath();
         pts.forEach(function (p, i) {
-          const x = xOf(i), y = yOf(Number(p._ratio));
+          const x = xOf(i), y = yOf(Number(p._spd));
           if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
         });
         ctx.strokeStyle = col;
@@ -2055,7 +2038,6 @@ function renderDarkQuery(item, profile) {
         ctx.lineJoin = "round";
         ctx.stroke();
 
-        // end point
         const ex = xOf(pts.length - 1), ey = yOf(last);
         ctx.fillStyle = col;
         ctx.beginPath();
@@ -2070,46 +2052,36 @@ function renderDarkQuery(item, profile) {
         const seen = {};
         labelIdx.forEach(function (i) {
           if (seen[i]) return; seen[i] = 1;
-          const tt = pts[i].t || "";
-          ctx.fillText(tt, xOf(i), cssH - 3);
+          ctx.fillText(pts[i].t || "", xOf(i), cssH - 3);
         });
 
-        // y max/min ratio labels
+        // y labels
         ctx.textAlign = "left";
-        ctx.fillText(fmtRatio(ymax), 2, pad.t + 8);
-        ctx.fillText(fmtRatio(ymin), 2, pad.t + H);
+        ctx.fillText(fmtSpd(ymax), 2, pad.t + 8);
+        ctx.fillText(fmtSpd(ymin), 2, pad.t + H);
 
         if (foot && latest) {
           const dYi = latest.delta_yi != null ? Number(latest.delta_yi) : NaN;
-          let paceN = latest.pace != null ? Number(latest.pace) : NaN;
-          if (!Number.isFinite(paceN) && pts.length) paceN = Number(pts[pts.length - 1]._ratio);
-          // ratio change speed over ~10 session minutes if available
-          let spdRatio = null;
-          if (pts.length >= 3) {
-            const a = pts[pts.length - 1];
-            const b = pts[pts.length - 3];
-            const ia = a.idx != null ? Number(a.idx) : NaN;
-            const ib = b.idx != null ? Number(b.idx) : NaN;
-            if (Number.isFinite(ia) && Number.isFinite(ib) && ia > ib) {
-              spdRatio = (Number(a._ratio) - Number(b._ratio)) / (ia - ib) * 10.0;
-            }
-          }
+          let spdN = latest.speed_yi_10m != null ? Number(latest.speed_yi_10m) : NaN;
+          if (!Number.isFinite(spdN) && pts.length) spdN = Number(pts[pts.length - 1]._spd);
+          const levelLabel = latest.level_label
+            || (Number.isFinite(dYi) ? (dYi > 1 ? "放量" : (dYi < -1 ? "缩量" : "持平")) : "—");
+          const speedLabel = latest.speed_label || (
+            Number.isFinite(spdN)
+              ? (spdN > 1.5 ? "势头向上" : (spdN < -1.5 ? "势头向下" : "势头平稳"))
+              : "—"
+          );
           const dCls = Number.isFinite(dYi) ? (dYi > 1 ? "up" : (dYi < -1 ? "down" : "")) : "";
-          const pCls = Number.isFinite(paceN) ? (paceN > 1.005 ? "up" : (paceN < 0.995 ? "down" : "")) : "";
-          const sCls = spdRatio != null
-            ? (spdRatio > 0.002 ? "up" : (spdRatio < -0.002 ? "down" : ""))
-            : "";
-          const pTxt = Number.isFinite(paceN) ? (paceN * 100).toFixed(1) + "%" : "—";
+          const sCls = Number.isFinite(spdN) ? (spdN > 1.5 ? "up" : (spdN < -1.5 ? "down" : "")) : "";
           const dTxt = Number.isFinite(dYi)
             ? ((dYi > 0 ? "+" : "") + dYi.toFixed(0) + "亿")
             : "—";
-          const sTxt = spdRatio == null || !Number.isFinite(spdRatio)
-            ? "—"
-            : ((spdRatio > 0 ? "+" : "") + (spdRatio * 100).toFixed(2) + "pt/10分");
+          const sTxt = Number.isFinite(spdN)
+            ? ((spdN > 0 ? "+" : "") + spdN.toFixed(1) + "亿/10分")
+            : "—";
           foot.innerHTML =
-            '比例<span class="' + pCls + '">' + pTxt + "</span>"
-            + ' · 差额<span class="' + dCls + '">' + dTxt + "</span>"
-            + ' · 速度<span class="' + sCls + '">' + sTxt + "</span>";
+            '一阶<span class="' + dCls + '">' + levelLabel + " " + dTxt + "</span>"
+            + ' · 二阶<span class="' + sCls + '">' + speedLabel + " " + sTxt + "</span>";
         }
       })();
 

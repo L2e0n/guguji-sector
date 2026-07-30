@@ -132,8 +132,8 @@
     }
     .vol-pace-legend .acc i { background: #c0392b; box-shadow: 0 0 0 2px rgba(192,57,43,0.12); }
     .vol-pace-legend .dec i { background: #1e8449; box-shadow: 0 0 0 2px rgba(30,132,73,0.12); }
-    .vol-pace-chart { position: relative; width: 100%; height: 72px; overflow: visible; }
-    .vol-pace-chart canvas { width: 100%; height: 72px; display: block; }
+    .vol-pace-chart { position: relative; width: 100%; height: 88px; overflow: visible; }
+    .vol-pace-chart canvas { width: 100%; height: 88px; display: block; }
     .vol-pace-empty {
       position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
       color: #aaa; font-size: 11px; pointer-events: none;
@@ -149,7 +149,7 @@
     }
     .vol-pace-foot .up { color: #c0392b; font-weight: 700; }
     .vol-pace-foot .down { color: #1e8449; font-weight: 700; }
-    .overview-card .vol-panel { overflow: visible; min-height: auto; }
+    .overview-card .vol-panel { overflow: visible !important; min-height: auto !important; height: auto !important; align-self: start; max-height: none !important; }
     .overview-card .vol-pace-wrap { flex: 0 0 auto; }
 
     .vol-vs-prev.expand { color: #c0392b; background: #fdecea; }
@@ -568,7 +568,7 @@
               <span style="color:#aaa">一条曲线·零轴上下</span>
             </div>
             <div class="vol-pace-chart">
-              <canvas id="volPaceCanvas" height="72"></canvas>
+              <canvas id="volPaceCanvas" height="88"></canvas>
               <div class="vol-pace-empty" id="volPaceEmpty">等待分时路径…</div>
             </div>
             <div class="vol-pace-foot" id="volPaceFoot">—</div>
@@ -1937,7 +1937,7 @@ function renderDarkQuery(item, profile) {
         const foot = $("volPaceFoot");
         const meta = $("volPaceMeta");
         if (!canvas) return;
-        const CH = 72;
+        const CH = 88;
         const pace = vol.vs_prev_pace || {};
         const rawPts = pace.points || [];
         const pts = rawPts.map(function (p) {
@@ -1985,7 +1985,7 @@ function renderDarkQuery(item, profile) {
         ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
         ctx.clearRect(0, 0, cssW, cssH);
 
-        const pad = { l: 34, r: 6, t: 10, b: 16 };
+        const pad = { l: 36, r: 8, t: 18, b: 18 };
         const W = Math.max(10, cssW - pad.l - pad.r);
         const H = Math.max(10, cssH - pad.t - pad.b);
         let ymin = 0, ymax = 0;
@@ -1996,17 +1996,23 @@ function renderDarkQuery(item, profile) {
         });
         ymin = Math.min(ymin, -1);
         ymax = Math.max(ymax, 1);
-        let padY = Math.max(2, (ymax - ymin) * 0.14);
+        // 上下多留空白，避免峰值/谷值贴边被 canvas 裁切
+        let padY = Math.max(4, (ymax - ymin) * 0.22);
         ymin -= padY;
         ymax += padY;
-        if (ymin < -120) ymin = -120;
-        if (ymax > 120) ymax = 120;
+        // 对称扩展，保证 0 轴附近可读
+        const absM = Math.max(Math.abs(ymin), Math.abs(ymax), 2);
+        ymin = -absM;
+        ymax = absM;
 
         const xOf = function (i) {
           return pad.l + (pts.length === 1 ? W / 2 : (i / (pts.length - 1)) * W);
         };
         const yOf = function (v) {
-          return pad.t + (1 - (v - ymin) / (ymax - ymin)) * H;
+          const vv = Math.max(ymin, Math.min(ymax, Number(v)));
+          const y = pad.t + (1 - (vv - ymin) / (ymax - ymin)) * H;
+          // 再内缩 1px，避免描边被画布上/下边缘裁掉
+          return Math.max(pad.t + 1, Math.min(pad.t + H - 1, y));
         };
         const fmtSpd = function (v) {
           const n = Number(v);
@@ -2132,8 +2138,8 @@ function renderDarkQuery(item, profile) {
 
         // y labels
         ctx.textAlign = "right";
-        ctx.fillText(fmtSpd(ymax), pad.l - 4, pad.t + 8);
-        ctx.fillText(fmtSpd(ymin), pad.l - 4, pad.t + H);
+        ctx.fillText(fmtSpd(ymax), pad.l - 4, pad.t + 9);
+        ctx.fillText(fmtSpd(ymin), pad.l - 4, pad.t + H - 1);
         ctx.textAlign = "left";
 
         if (foot && latest) {

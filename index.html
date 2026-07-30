@@ -539,11 +539,11 @@
               <tr><td colspan="3" style="text-align:center;color:#999">加载中…</td></tr>
             </tbody>
           </table>
-          <div id="volVsPrev" class="vol-vs-prev">较昨日量能：—</div>
+          <div id="volVsPrev" class="vol-vs-prev">量能：—</div>
           <div class="vol-pace-wrap">
             <div class="vol-pace-head">
               <span>放缩速度</span>
-              <span class="subk" id="volPaceMeta">较昨推全天 · 亿</span>
+              <span class="subk" id="volPaceMeta">较昨比例 · 1.0=持平</span>
             </div>
             <div class="vol-pace-chart">
               <canvas id="volPaceCanvas" height="84"></canvas>
@@ -1900,15 +1900,14 @@ function renderDarkQuery(item, profile) {
           const sign = Number(dYi) > 0 ? "+" : (Number(dYi) < 0 ? "-" : "");
           // basisHint is about TODAY's ref (predict vs actual), NOT yesterday.
           // Yesterday amount is always realized full-day turnover.
-          const todayHint = vs.basis && String(vs.basis).indexOf("predict") === 0 ? "今预测" : "今实际";
-          vsEl.textContent = "较昨日" + lab + " " + sign + absTxt + "亿"
-            + (prevYi != null ? "（昨实际" + Number(prevYi).toFixed(0) + "亿" + (prevDay ? " " + prevDay.slice(5) : "") + " · " + todayHint + "）" : "");
+          vsEl.textContent = lab + " " + sign + absTxt + "亿"
+            + (prevYi != null ? "（昨实际" + Number(prevYi).toFixed(0) + "亿" + (prevDay ? " " + prevDay.slice(5) : "") + "）" : "");
         } else {
-          vsEl.textContent = "较昨日量能：—";
+          vsEl.textContent = "量能：—";
         }
       }
 
-      // 放量/缩量速度时序（较昨推全天 delta）
+      // 放量/缩量比例时序（较昨推全天 pace，1.0=持平）
       (function renderVolPace() {
         const canvas = $("volPaceCanvas");
         const empty = $("volPaceEmpty");
@@ -1917,14 +1916,33 @@ function renderDarkQuery(item, profile) {
         if (!canvas) return;
         const pace = vol.vs_prev_pace || {};
         const pts = (pace.points || []).filter(function (p) {
-          return p && p.delta_yi != null && Number.isFinite(Number(p.delta_yi));
+          if (!p) return false;
+          const r = p.pace != null ? Number(p.pace) : NaN;
+          if (Number.isFinite(r) && r > 0) return true;
+          // fallback: derive ratio from delta/prev if needed
+          if (p.delta_yi != null && p.prev_yi != null) return true;
+          if (p.delta_yi != null && pace.latest && pace.latest.prev_yi != null) return true;
+          return false;
+        }).map(function (p) {
+          let r = p.pace != null ? Number(p.pace) : NaN;
+          if (!Number.isFinite(r) || r <= 0) {
+            const prevYi = p.prev_yi != null ? Number(p.prev_yi)
+              : (pace.latest && pace.latest.prev_yi != null ? Number(pace.latest.prev_yi) : NaN);
+            const dYi = p.delta_yi != null ? Number(p.delta_yi) : NaN;
+            if (Number.isFinite(prevYi) && prevYi > 0 && Number.isFinite(dYi)) {
+              r = (prevYi + dYi) / prevYi;
+            }
+          }
+          return Object.assign({}, p, { _ratio: r });
+        }).filter(function (p) {
+          return Number.isFinite(p._ratio) && p._ratio > 0;
         });
         const latest = pace.latest || (pts.length ? pts[pts.length - 1] : null);
 
         if (meta) {
           meta.textContent = pts.length
-            ? ("较昨推全天 · " + pts.length + "点")
-            : "较昨推全天 · 亿";
+            ? ("较昨比例 · " + pts.length + "点 · 1.0=持平")
+            : "较昨比例 · 1.0=持平";
         }
 
         if (!pts.length) {
@@ -1958,63 +1976,78 @@ function renderDarkQuery(item, profile) {
         ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
         ctx.clearRect(0, 0, cssW, cssH);
 
-        const pad = { l: 28, r: 8, t: 8, b: 16 };
+        const pad = { l: 32, r: 8, t: 8, b: 16 };
         const W = cssW - pad.l - pad.r;
         const H = cssH - pad.t - pad.b;
-        let ymin = 0, ymax = 0;
+        let ymin = 1, ymax = 1;
         pts.forEach(function (p) {
-          const v = Number(p.delta_yi);
+          const v = Number(p._ratio);
           ymin = Math.min(ymin, v);
           ymax = Math.max(ymax, v);
         });
-        if (ymin === ymax) { ymin -= 10; ymax += 10; }
-        const padY = Math.max(5, (ymax - ymin) * 0.12);
-        ymin -= padY; ymax += padY;
+        // keep 1.0 baseline in view; avoid flat scale
+        ymin = Math.min(ymin, 0.98);
+        ymax = Math.max(ymax, 1.02);
+        // symmetric-ish padding around data
+        let padY = Math.max(0.01, (ymax - ymin) * 0.15);
+        ymin -= padY;
+        ymax += padY;
+        // clamp extreme early noise for readability
+        if (ymin < 0.6) ymin = 0.6;
+        if (ymax > 1.6) ymax = 1.6;
+        if (ymax - ymin < 0.04) {
+          const mid = (ymin + ymax) / 2;
+          ymin = mid - 0.02;
+          ymax = mid + 0.02;
+        }
         const xOf = function (i) {
           return pad.l + (pts.length === 1 ? W / 2 : (i / (pts.length - 1)) * W);
         };
         const yOf = function (v) {
           return pad.t + (1 - (v - ymin) / (ymax - ymin)) * H;
         };
+        const fmtRatio = function (v) {
+          return (Number(v) * 100).toFixed(0) + "%";
+        };
 
         // bg
         ctx.fillStyle = "#fcfdff";
         ctx.fillRect(0, 0, cssW, cssH);
 
-        // zero line
-        if (ymin < 0 && ymax > 0) {
+        // baseline 1.0 = 持平
+        if (ymin < 1 && ymax > 1) {
           ctx.strokeStyle = "#c5ccd6";
           ctx.setLineDash([4, 3]);
           ctx.beginPath();
-          ctx.moveTo(pad.l, yOf(0));
-          ctx.lineTo(pad.l + W, yOf(0));
+          ctx.moveTo(pad.l, yOf(1));
+          ctx.lineTo(pad.l + W, yOf(1));
           ctx.stroke();
           ctx.setLineDash([]);
           ctx.fillStyle = "#9aa3af";
           ctx.font = "10px sans-serif";
           ctx.textAlign = "left";
-          ctx.fillText("0", 4, yOf(0) + 3);
+          ctx.fillText("100%", 2, yOf(1) + 3);
         }
 
-        const last = Number(pts[pts.length - 1].delta_yi);
-        const col = last > 1 ? "#c0392b" : (last < -1 ? "#1e8449" : "#5d6d7e");
+        const last = Number(pts[pts.length - 1]._ratio);
+        const col = last > 1.005 ? "#c0392b" : (last < 0.995 ? "#1e8449" : "#5d6d7e");
 
-        // soft fill to zero
+        // soft fill to 1.0 baseline
         ctx.beginPath();
         pts.forEach(function (p, i) {
-          const x = xOf(i), y = yOf(Number(p.delta_yi));
+          const x = xOf(i), y = yOf(Number(p._ratio));
           if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
         });
-        ctx.lineTo(xOf(pts.length - 1), yOf(0));
-        ctx.lineTo(xOf(0), yOf(0));
+        ctx.lineTo(xOf(pts.length - 1), yOf(1));
+        ctx.lineTo(xOf(0), yOf(1));
         ctx.closePath();
-        ctx.fillStyle = last >= 0 ? "rgba(192,57,43,0.10)" : "rgba(30,132,73,0.10)";
+        ctx.fillStyle = last >= 1 ? "rgba(192,57,43,0.10)" : "rgba(30,132,73,0.10)";
         ctx.fill();
 
         // line on top
         ctx.beginPath();
         pts.forEach(function (p, i) {
-          const x = xOf(i), y = yOf(Number(p.delta_yi));
+          const x = xOf(i), y = yOf(Number(p._ratio));
           if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
         });
         ctx.strokeStyle = col;
@@ -2037,29 +2070,45 @@ function renderDarkQuery(item, profile) {
         const seen = {};
         labelIdx.forEach(function (i) {
           if (seen[i]) return; seen[i] = 1;
-          const t = pts[i].t || "";
-          ctx.fillText(t, xOf(i), cssH - 3);
+          const tt = pts[i].t || "";
+          ctx.fillText(tt, xOf(i), cssH - 3);
         });
 
-        // y max label
+        // y max/min ratio labels
         ctx.textAlign = "left";
-        ctx.fillText((ymax >= 0 ? "+" : "") + Math.round(ymax), 2, pad.t + 8);
-        ctx.fillText((ymin >= 0 ? "+" : "") + Math.round(ymin), 2, pad.t + H);
+        ctx.fillText(fmtRatio(ymax), 2, pad.t + 8);
+        ctx.fillText(fmtRatio(ymin), 2, pad.t + H);
 
         if (foot && latest) {
-          const dYi = Number(latest.delta_yi);
-          const paceN = latest.pace != null ? Number(latest.pace) : null;
-          const spd = latest.speed_yi_10m != null ? Number(latest.speed_yi_10m) : null;
-          const dCls = dYi > 1 ? "up" : (dYi < -1 ? "down" : "");
-          const sCls = spd != null ? (spd > 0.5 ? "up" : (spd < -0.5 ? "down" : "")) : "";
-          const dTxt = (dYi > 0 ? "+" : "") + dYi.toFixed(0) + "亿";
-          const pTxt = paceN != null ? (paceN * 100).toFixed(1) + "%" : "—";
-          const sTxt = spd == null || !Number.isFinite(spd)
+          const dYi = latest.delta_yi != null ? Number(latest.delta_yi) : NaN;
+          let paceN = latest.pace != null ? Number(latest.pace) : NaN;
+          if (!Number.isFinite(paceN) && pts.length) paceN = Number(pts[pts.length - 1]._ratio);
+          // ratio change speed over ~10 session minutes if available
+          let spdRatio = null;
+          if (pts.length >= 3) {
+            const a = pts[pts.length - 1];
+            const b = pts[pts.length - 3];
+            const ia = a.idx != null ? Number(a.idx) : NaN;
+            const ib = b.idx != null ? Number(b.idx) : NaN;
+            if (Number.isFinite(ia) && Number.isFinite(ib) && ia > ib) {
+              spdRatio = (Number(a._ratio) - Number(b._ratio)) / (ia - ib) * 10.0;
+            }
+          }
+          const dCls = Number.isFinite(dYi) ? (dYi > 1 ? "up" : (dYi < -1 ? "down" : "")) : "";
+          const pCls = Number.isFinite(paceN) ? (paceN > 1.005 ? "up" : (paceN < 0.995 ? "down" : "")) : "";
+          const sCls = spdRatio != null
+            ? (spdRatio > 0.002 ? "up" : (spdRatio < -0.002 ? "down" : ""))
+            : "";
+          const pTxt = Number.isFinite(paceN) ? (paceN * 100).toFixed(1) + "%" : "—";
+          const dTxt = Number.isFinite(dYi)
+            ? ((dYi > 0 ? "+" : "") + dYi.toFixed(0) + "亿")
+            : "—";
+          const sTxt = spdRatio == null || !Number.isFinite(spdRatio)
             ? "—"
-            : ((spd > 0 ? "+" : "") + spd.toFixed(1) + "亿/10分");
+            : ((spdRatio > 0 ? "+" : "") + (spdRatio * 100).toFixed(2) + "pt/10分");
           foot.innerHTML =
-            '当前<span class="' + dCls + '">' + dTxt + "</span>"
-            + " · 相对昨" + pTxt
+            '比例<span class="' + pCls + '">' + pTxt + "</span>"
+            + ' · 差额<span class="' + dCls + '">' + dTxt + "</span>"
             + ' · 速度<span class="' + sCls + '">' + sTxt + "</span>";
         }
       })();

@@ -560,12 +560,12 @@
           <div class="vol-pace-wrap">
             <div class="vol-pace-head">
               <span>量能比值</span>
-              <span class="subk" id="volPaceMeta">今预测÷昨实际 · 1=持平</span>
+              <span class="subk" id="volPaceMeta">今预测/昨实际 · 100%=持平</span>
             </div>
-            <div class="vol-pace-legend" id="volPaceLegend" title="纵轴=今日预测量能/昨日实际量能；1.0=与昨日持平">
-              <span class="acc"><i></i>&gt;1 放量</span>
-              <span class="dec"><i></i>&lt;1 缩量</span>
-              <span style="color:#aaa">基准 1.0</span>
+            <div class="vol-pace-legend" id="volPaceLegend" title="纵轴=今日预测量能/昨日实际量能×100%；100%=与昨日持平">
+              <span class="acc"><i></i>&gt;100% 放量</span>
+              <span class="dec"><i></i>&lt;100% 缩量</span>
+              <span style="color:#aaa">基准 100%</span>
             </div>
             <div class="vol-pace-chart">
               <canvas id="volPaceCanvas" height="88"></canvas>
@@ -1929,7 +1929,7 @@ function renderDarkQuery(item, profile) {
         }
       }
 
-      // 量能比值：纵轴 = 今日预测全天量能 / 昨日实际量能（pace）；1.0=与昨持平
+      // 量能比值：纵轴 = 今日预测全天量能 / 昨日实际量能 ×100%（pace*100）；100%=与昨持平
       (function renderVolPace() {
         const canvas = $("volPaceCanvas");
         const empty = $("volPaceEmpty");
@@ -1950,14 +1950,15 @@ function renderDarkQuery(item, profile) {
             r = (Number(p.prev_yi) + Number(p.delta_yi)) / Number(p.prev_yi);
           }
           if (!Number.isFinite(r) || r <= 0) return null;
-          return Object.assign({}, p, { _ratio: r });
+          // 纵轴用百分比：100 = 与昨持平
+          return Object.assign({}, p, { _ratio: r * 100 });
         }).filter(Boolean);
         const latest = pace.latest || (pts.length ? pts[pts.length - 1] : null);
 
         if (meta) {
           meta.textContent = pts.length
-            ? ("今预测÷昨实际 · " + pts.length + "点")
-            : "今预测÷昨实际 · 1=持平";
+            ? ("今预测/昨实际% · " + pts.length + "点")
+            : "今预测/昨实际 · 100%=持平";
         }
 
         if (!pts.length) {
@@ -1990,27 +1991,26 @@ function renderDarkQuery(item, profile) {
         ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
         ctx.clearRect(0, 0, cssW, cssH);
 
-        const pad = { l: 40, r: 8, t: 16, b: 18 };
+        const pad = { l: 44, r: 8, t: 16, b: 18 };
         const W = Math.max(10, cssW - pad.l - pad.r);
         const H = Math.max(10, cssH - pad.t - pad.b);
 
-        let ymin = 1, ymax = 1;
+        let ymin = 100, ymax = 100;
         pts.forEach(function (p) {
           const v = Number(p._ratio);
           ymin = Math.min(ymin, v);
           ymax = Math.max(ymax, v);
         });
-        // always include baseline 1.0, leave breathing room
-        ymin = Math.min(ymin, 0.95);
-        ymax = Math.max(ymax, 1.05);
-        let padY = Math.max(0.02, (ymax - ymin) * 0.18);
-        ymin = Math.max(0.5, ymin - padY); // avoid absurd low axis on open noise
-        ymax = Math.min(2.5, ymax + padY); // cap extreme open overshoot for readability
-        // if still clipped extremes, expand slightly to data (soft cap only for display range)
+        // always include baseline 100%, leave breathing room
+        ymin = Math.min(ymin, 95);
+        ymax = Math.max(ymax, 105);
+        let padY = Math.max(2, (ymax - ymin) * 0.18);
+        ymin = Math.max(50, ymin - padY);
+        ymax = Math.min(250, ymax + padY);
         pts.forEach(function (p) {
           const v = Number(p._ratio);
-          if (v < ymin) ymin = Math.max(0.3, v - 0.02);
-          if (v > ymax) ymax = Math.min(3.0, v + 0.02);
+          if (v < ymin) ymin = Math.max(30, v - 2);
+          if (v > ymax) ymax = Math.min(300, v + 2);
         });
 
         const xOf = function (i) {
@@ -2024,19 +2024,20 @@ function renderDarkQuery(item, profile) {
         const fmtRatio = function (v) {
           const n = Number(v);
           if (!Number.isFinite(n)) return "—";
-          return n.toFixed(2);
+          const body = Math.abs(n) >= 100 ? Math.round(n).toString() : n.toFixed(1);
+          return body + "%";
         };
 
-        // samples with 1.0 crossings for dual-tone split
+        // samples with 100% crossings for dual-tone split
         const samples = [];
         for (let i = 0; i < pts.length; i++) {
           samples.push({ v: Number(pts[i]._ratio), x: xOf(i), y: yOf(Number(pts[i]._ratio)) });
           if (i < pts.length - 1) {
             const v0 = Number(pts[i]._ratio), v1 = Number(pts[i + 1]._ratio);
-            if ((v0 > 1 && v1 < 1) || (v0 < 1 && v1 > 1)) {
-              const r = Math.abs(v0 - 1) / (Math.abs(v0 - 1) + Math.abs(v1 - 1));
+            if ((v0 > 100 && v1 < 100) || (v0 < 100 && v1 > 100)) {
+              const r = Math.abs(v0 - 100) / (Math.abs(v0 - 100) + Math.abs(v1 - 100));
               const xz = xOf(i) + (xOf(i + 1) - xOf(i)) * r;
-              samples.push({ v: 1, x: xz, y: yOf(1), z: true });
+              samples.push({ v: 100, x: xz, y: yOf(100), z: true });
             }
           }
         }
@@ -2044,8 +2045,8 @@ function renderDarkQuery(item, profile) {
         ctx.fillStyle = "#fcfdff";
         ctx.fillRect(0, 0, cssW, cssH);
 
-        // baseline 1.0 = 与昨持平
-        const y1 = yOf(1);
+        // baseline 100% = 与昨持平
+        const y1 = yOf(100);
         ctx.strokeStyle = "#c5ccd6";
         ctx.lineWidth = 1;
         ctx.setLineDash([4, 3]);
@@ -2057,14 +2058,14 @@ function renderDarkQuery(item, profile) {
         ctx.fillStyle = "#9aa3af";
         ctx.font = "10px sans-serif";
         ctx.textAlign = "left";
-        ctx.fillText("1.0", 4, y1 + 3);
+        ctx.fillText("100%", 2, y1 + 3);
 
         function fillBand(above) {
           ctx.beginPath();
           let started = false;
           for (let k = 0; k < samples.length; k++) {
             const s = samples[k];
-            const on = above ? s.v >= 1 : s.v <= 1;
+            const on = above ? s.v >= 100 : s.v <= 100;
             if (!on) {
               if (started) {
                 ctx.lineTo(s.x, y1);
@@ -2104,7 +2105,7 @@ function renderDarkQuery(item, profile) {
           let pen = false;
           for (let k = 0; k < samples.length; k++) {
             const s = samples[k];
-            const on = above ? s.v >= 1 : s.v <= 1;
+            const on = above ? s.v >= 100 : s.v <= 100;
             if (!on) { pen = false; continue; }
             if (!pen) { ctx.moveTo(s.x, s.y); pen = true; }
             else ctx.lineTo(s.x, s.y);
@@ -2115,7 +2116,7 @@ function renderDarkQuery(item, profile) {
         strokeBand(false, "#1e8449");
 
         const last = Number(pts[pts.length - 1]._ratio);
-        const col = last > 1.005 ? "#c0392b" : (last < 0.995 ? "#1e8449" : "#5d6d7e");
+        const col = last > 100.5 ? "#c0392b" : (last < 99.5 ? "#1e8449" : "#5d6d7e");
         const ex = xOf(pts.length - 1), ey = yOf(last);
         ctx.fillStyle = col;
         ctx.beginPath();
@@ -2146,19 +2147,20 @@ function renderDarkQuery(item, profile) {
         ctx.textAlign = "left";
 
         if (foot && latest) {
-          let rN = latest.pace != null ? Number(latest.pace) : NaN;
-          if (!Number.isFinite(rN) && pts.length) rN = Number(pts[pts.length - 1]._ratio);
+          let pctN = latest.pace != null ? Number(latest.pace) * 100 : NaN;
+          if (!Number.isFinite(pctN) && pts.length) pctN = Number(pts[pts.length - 1]._ratio);
+          const rN = Number.isFinite(pctN) ? pctN / 100 : NaN;
           const dYi = latest.delta_yi != null ? Number(latest.delta_yi) : (
             Number.isFinite(rN) && latest.prev_yi != null
               ? (rN - 1) * Number(latest.prev_yi)
               : NaN
           );
           const levelLabel = latest.level_label
-            || (Number.isFinite(rN) ? (rN > 1.005 ? "放量" : (rN < 0.995 ? "缩量" : "持平")) : "—");
-          const rCls = Number.isFinite(rN) ? (rN > 1.005 ? "up" : (rN < 0.995 ? "down" : "")) : "";
+            || (Number.isFinite(pctN) ? (pctN > 100.5 ? "放量" : (pctN < 99.5 ? "缩量" : "持平")) : "—");
+          const rCls = Number.isFinite(pctN) ? (pctN > 100.5 ? "up" : (pctN < 99.5 ? "down" : "")) : "";
           const dCls = Number.isFinite(dYi) ? (dYi > 1 ? "up" : (dYi < -1 ? "down" : "")) : "";
-          const rTxt = Number.isFinite(rN)
-            ? (rN.toFixed(3) + "×（" + ((rN - 1) * 100 >= 0 ? "+" : "") + ((rN - 1) * 100).toFixed(1) + "%）")
+          const rTxt = Number.isFinite(pctN)
+            ? (pctN.toFixed(1) + "%（较昨" + ((pctN - 100) >= 0 ? "+" : "") + (pctN - 100).toFixed(1) + "%）")
             : "—";
           const dTxt = Number.isFinite(dYi)
             ? ((dYi > 0 ? "+" : "") + dYi.toFixed(0) + "亿")

@@ -433,95 +433,106 @@
     .overview-card .vol-vs-prev {
       margin-top: auto; padding: 6px 8px; font-size: 13px; border-radius: 6px;
     }
-    /* 沪深京量能：表/标题再压 1-2 号；比值图加高且不被后段 CSS 覆盖 */
+    /* 沪深京量能：表内字号 12px（对齐涨停个股名单 limit-tops） UI-VOLFONT-12 */
     .overview-card .vol-panel {
-      padding: 5px 7px;
+      padding: 8px 10px;
       height: auto !important;
       max-height: none !important;
       overflow: visible !important;
       align-self: start;
     }
     .overview-card .vol-panel h3 {
-      margin: 0 0 2px;
-      font-size: 10px;
+      margin: 0 0 6px;
+      font-size: 14px !important;
       flex: 0 0 auto;
     }
     .overview-card .vol-panel h3 .subk {
-      font-size: 8px;
+      font-size: 11px !important;
+    }
+    .overview-card .vol-panel .mtable,
+    .overview-card .vol-panel table.mtable.vol-mtable,
+    .overview-card .vol-panel .mtable th,
+    .overview-card .vol-panel .mtable td,
+    .overview-card .vol-panel .mtable td.b,
+    .overview-card .vol-panel .mtable .chg,
+    .overview-card .vol-panel .mtable .nest,
+    .overview-card .vol-panel .mtable .name {
+      font-size: 12px !important;
+      line-height: 1.45 !important;
     }
     .overview-card .vol-panel .mtable {
-      font-size: 9px;
-      line-height: 1.12;
       width: 100%;
       flex: 0 0 auto;
+      table-layout: fixed;
     }
     .overview-card .vol-panel .mtable th,
     .overview-card .vol-panel .mtable td {
-      padding: 1px 2px;
-      line-height: 1.15;
+      padding: 4px 3px !important;
       vertical-align: middle;
     }
     .overview-card .vol-panel .mtable th {
-      font-size: 8px;
-      padding-bottom: 2px;
+      font-size: 11px !important;
+      padding-bottom: 3px !important;
       font-weight: 600;
     }
     .overview-card .vol-panel .mtable td.b {
-      font-size: 10px;
-      font-weight: 700;
-      letter-spacing: 0;
+      font-weight: 800 !important;
+    }
+    .overview-card .vol-panel .mtable .chg {
+      font-weight: 700 !important;
+      margin-left: 3px;
     }
     .overview-card .vol-panel .mtable tbody tr + tr td {
       border-top: 1px solid #f5edd0;
     }
-    .overview-card .vol-panel .mtable .chg {
-      font-size: 8px;
-      font-weight: 600;
-      margin-left: 2px;
-    }
     .overview-card .vol-panel .mtable .nest {
       color: #666;
-      font-size: 9px;
+      font-weight: 500 !important;
     }
     .overview-card .vol-panel .mtable .nest-mark {
       color: #bbb;
-      margin-right: 1px;
-      font-size: 8px;
+      margin-right: 2px;
+      font-size: 11px !important;
+      font-weight: 600 !important;
+    }
+    .overview-card .vol-panel .mtable .name {
+      font-weight: 600 !important;
     }
     .overview-card .vol-panel .vol-vs-prev {
-      margin-top: 3px;
+      margin-top: 6px;
       margin-bottom: 0;
-      padding: 2px 5px;
-      font-size: 9px;
-      border-radius: 5px;
-      line-height: 1.2;
+      padding: 5px 8px;
+      font-size: 12px !important;
+      font-weight: 700 !important;
+      border-radius: 6px;
+      line-height: 1.35;
       flex: 0 0 auto;
     }
     .overview-card .vol-panel .vol-pace-wrap {
-      margin-top: 4px;
-      padding-top: 4px;
+      margin-top: 6px;
+      padding-top: 6px;
       flex: 0 0 auto;
     }
     .overview-card .vol-panel .vol-pace-head {
-      font-size: 9px;
-      margin-bottom: 2px;
+      font-size: 12px !important;
+      margin-bottom: 3px;
     }
     .overview-card .vol-panel .vol-pace-head .subk {
-      font-size: 8px;
+      font-size: 11px !important;
     }
     .overview-card .vol-panel .vol-pace-legend {
-      font-size: 8px;
-      margin-bottom: 2px;
-      gap: 5px;
+      font-size: 11px !important;
+      margin-bottom: 3px;
+      gap: 6px;
     }
     .overview-card .vol-panel .vol-pace-chart,
     .overview-card .vol-panel .vol-pace-chart canvas {
       height: 120px !important;
     }
     .overview-card .vol-panel .vol-pace-foot {
-      margin-top: 2px;
-      font-size: 8px;
-      line-height: 1.25;
+      margin-top: 3px;
+      font-size: 11px !important;
+      line-height: 1.35;
     }
 
     .overview-card .limit-stats { gap: 6px; flex: 0 0 auto; }
@@ -629,11 +640,11 @@
             <span>📊 沪深京量能</span>
             <span class="subk" id="volMeta">进度 · 亿元</span>
           </h3>
-          <table class="mtable">
+          <table class="mtable vol-mtable" style="font-size:12px;line-height:1.45">
             <thead>
-              <tr><th>市场</th><th>实际</th><th>预测全天</th></tr>
+              <tr><th style="font-size:11px">市场</th><th style="font-size:11px">实际</th><th style="font-size:11px">预测全天</th></tr>
             </thead>
-            <tbody id="volBody">
+            <tbody id="volBody" style="font-size:12px">
               <tr><td colspan="3" style="text-align:center;color:#999">加载中…</td></tr>
             </tbody>
           </table>
@@ -2038,12 +2049,12 @@ function renderMarket(data) {
           ? ' <span class="chg ' + toneClass(x.change_pct) + '">' + fmtPct(x.change_pct) + "</span>"
           : "";
         const nameHtml = row.indent
-          ? '<span class="nest-mark">└</span><span class="nest">' + row.name + "</span>"
-          : row.name;
+          ? '<span class="nest-mark">└</span><span class="nest name">' + row.name + "</span>"
+          : '<span class="name">' + row.name + "</span>";
         return "<tr" + (row.indent ? ' class="vol-nest"' : (row.strong ? ' class="vol-sum"' : "")) + ">"
-          + "<td>" + nameHtml + chg + "</td>"
-          + '<td class="' + strong + '">' + act + "</td>"
-          + '<td class="' + strong + '">' + pred + "</td>"
+          + '<td style="font-size:12px">' + nameHtml + chg + "</td>"
+          + '<td class="' + strong + '" style="font-size:12px">' + act + "</td>"
+          + '<td class="' + strong + '" style="font-size:12px">' + pred + "</td>"
           + "</tr>";
       }).join("");
 

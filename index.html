@@ -172,10 +172,10 @@
     .limit-box .s { display:block; font-size: 10px; color: #aaa; margin-top: 2px; min-height: 14px; }
     .limit-tops { margin-top: 8px; font-size: 11px; color: #666; line-height: 1.55; }
     .structure-grid {
-      display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 8px; margin-top: 10px;
+      display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 8px; margin-top: 10px;
     }
-    @media (min-width: 720px) {
-      .structure-grid { grid-template-columns: repeat(4, minmax(0,1fr)); }
+    @media (max-width: 520px) {
+      .structure-grid { grid-template-columns: repeat(2, minmax(0,1fr)); }
     }
     .structure-box {
       background: #fff; border: 1px solid #f0e6c0; border-radius: 10px; padding: 8px 8px 7px; text-align: center;
@@ -414,7 +414,7 @@
     @media (min-width: 1020px) {
       .overview-main { grid-template-columns: 1.15fr 1fr 1.05fr; }
       .overview-main > .structure-panel { grid-column: auto; }
-      .overview-card .structure-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .overview-card .structure-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
     }
     .overview-card .market-panel {
       padding: 10px 10px; border-radius: 10px; margin-top: 0 !important;

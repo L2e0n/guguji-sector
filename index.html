@@ -602,7 +602,7 @@
         <div class="structure-grid" id="structGrid">
           <!-- filled by renderStructure: 宽基ETF + 合计/北向 -->
         </div>
-        <div class="structure-note" id="structNote">宽基ETF场内主力净流入（超大+大单分档）；盘中暂无场外申赎。</div>
+        <div class="structure-note" id="structNote">宽基场内ETF主力净流入加总（超大+大单，非申赎；同指数多产品重叠）</div>
       </div>
       </div>
 
@@ -1844,9 +1844,9 @@ function renderDarkQuery(item, profile) {
       if (isEtf && grid) {
         const parts = [];
         items.forEach((it) => {
-          const codes = (it.codes && it.codes.length) ? it.codes.join("/") : (it.code || "");
+          const nLegs = (it.leg_ok != null) ? it.leg_ok : ((it.codes && it.codes.length) ? it.codes.length : 0);
           const style = it.style || "";
-          const sub = [style, codes].filter(Boolean).join(" · ") || "场内分档";
+          const sub = [style, (nLegs ? (nLegs + "只") : "")].filter(Boolean).join(" · ") || "场内ETF";
           parts.push(boxHtml({
             k: it.name || it.key || "ETF",
             num: it.main_net_yi,
@@ -1892,7 +1892,7 @@ function renderDarkQuery(item, profile) {
         }
         if ($("structNote")) {
           $("structNote").textContent = struct.disclaimer
-            || "宽基ETF二级市场主力净流入（超大+大单）；场外申赎盘中暂无；多标的组内加总。";
+            || "宽基场内ETF主力净流入加总（超大+大单，非申赎；同指数多产品重叠）";
         }
         return;
       }

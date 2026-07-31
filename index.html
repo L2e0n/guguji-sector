@@ -559,13 +559,13 @@
           <div id="volVsPrev" class="vol-vs-prev">量能：—</div>
           <div class="vol-pace-wrap">
             <div class="vol-pace-head">
-              <span>放缩速度</span>
-              <span class="subk" id="volPaceMeta">亿/10分 · 0=不变</span>
+              <span>量能比值</span>
+              <span class="subk" id="volPaceMeta">今预测÷昨实际 · 1=持平</span>
             </div>
-            <div class="vol-pace-legend" id="volPaceLegend" title="同一条二阶速度在0轴上下分段着色：上=加速、下=减速">
-              <span class="acc"><i></i>加速</span>
-              <span class="dec"><i></i>减速</span>
-              <span style="color:#aaa">一条曲线·零轴上下</span>
+            <div class="vol-pace-legend" id="volPaceLegend" title="纵轴=今日预测量能/昨日实际量能；1.0=与昨日持平">
+              <span class="acc"><i></i>&gt;1 放量</span>
+              <span class="dec"><i></i>&lt;1 缩量</span>
+              <span style="color:#aaa">基准 1.0</span>
             </div>
             <div class="vol-pace-chart">
               <canvas id="volPaceCanvas" height="88"></canvas>
@@ -1929,8 +1929,7 @@ function renderDarkQuery(item, profile) {
         }
       }
 
-      // 放缩速度 = 放量/缩量差额的变化率（二阶）；纵轴 亿/10分钟，0=势头不变
-      // 视觉：同一条速度曲线，>0 红(加速)、<0 绿(减速) —— 不是两条独立业务线
+      // 量能比值：纵轴 = 今日预测全天量能 / 昨日实际量能（pace）；1.0=与昨持平
       (function renderVolPace() {
         const canvas = $("volPaceCanvas");
         const empty = $("volPaceEmpty");
@@ -1942,23 +1941,29 @@ function renderDarkQuery(item, profile) {
         const rawPts = pace.points || [];
         const pts = rawPts.map(function (p) {
           if (!p) return null;
-          let spd = p.speed_smooth_yi_10m != null ? Number(p.speed_smooth_yi_10m)
-            : (p.speed_yi_10m != null ? Number(p.speed_yi_10m) : NaN);
-          if (!Number.isFinite(spd)) return null;
-          return Object.assign({}, p, { _spd: spd });
+          let r = p.pace != null ? Number(p.pace) : NaN;
+          if (!Number.isFinite(r) && p.implied_yi != null && p.prev_yi != null && Number(p.prev_yi) > 0) {
+            r = Number(p.implied_yi) / Number(p.prev_yi);
+          }
+          // fallback from delta + prev if needed
+          if (!Number.isFinite(r) && p.delta_yi != null && p.prev_yi != null && Number(p.prev_yi) > 0) {
+            r = (Number(p.prev_yi) + Number(p.delta_yi)) / Number(p.prev_yi);
+          }
+          if (!Number.isFinite(r) || r <= 0) return null;
+          return Object.assign({}, p, { _ratio: r });
         }).filter(Boolean);
         const latest = pace.latest || (pts.length ? pts[pts.length - 1] : null);
 
         if (meta) {
           meta.textContent = pts.length
-            ? ("亿/10分 · " + pts.length + "点")
-            : "亿/10分 · 0=不变";
+            ? ("今预测÷昨实际 · " + pts.length + "点")
+            : "今预测÷昨实际 · 1=持平";
         }
 
         if (!pts.length) {
           if (empty) {
             empty.style.display = "flex";
-            empty.textContent = "等待速度序列…";
+            empty.textContent = "等待比值序列…";
           }
           if (foot) foot.textContent = "—";
           const ctx0 = canvas.getContext("2d");
@@ -1985,25 +1990,28 @@ function renderDarkQuery(item, profile) {
         ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
         ctx.clearRect(0, 0, cssW, cssH);
 
-        const pad = { l: 36, r: 8, t: 18, b: 18 };
+        const pad = { l: 40, r: 8, t: 16, b: 18 };
         const W = Math.max(10, cssW - pad.l - pad.r);
         const H = Math.max(10, cssH - pad.t - pad.b);
-        let ymin = 0, ymax = 0;
+
+        let ymin = 1, ymax = 1;
         pts.forEach(function (p) {
-          const v = Number(p._spd);
+          const v = Number(p._ratio);
           ymin = Math.min(ymin, v);
           ymax = Math.max(ymax, v);
         });
-        ymin = Math.min(ymin, -1);
-        ymax = Math.max(ymax, 1);
-        // 上下多留空白，避免峰值/谷值贴边被 canvas 裁切
-        let padY = Math.max(4, (ymax - ymin) * 0.22);
-        ymin -= padY;
-        ymax += padY;
-        // 对称扩展，保证 0 轴附近可读
-        const absM = Math.max(Math.abs(ymin), Math.abs(ymax), 2);
-        ymin = -absM;
-        ymax = absM;
+        // always include baseline 1.0, leave breathing room
+        ymin = Math.min(ymin, 0.95);
+        ymax = Math.max(ymax, 1.05);
+        let padY = Math.max(0.02, (ymax - ymin) * 0.18);
+        ymin = Math.max(0.5, ymin - padY); // avoid absurd low axis on open noise
+        ymax = Math.min(2.5, ymax + padY); // cap extreme open overshoot for readability
+        // if still clipped extremes, expand slightly to data (soft cap only for display range)
+        pts.forEach(function (p) {
+          const v = Number(p._ratio);
+          if (v < ymin) ymin = Math.max(0.3, v - 0.02);
+          if (v > ymax) ymax = Math.min(3.0, v + 0.02);
+        });
 
         const xOf = function (i) {
           return pad.l + (pts.length === 1 ? W / 2 : (i / (pts.length - 1)) * W);
@@ -2011,25 +2019,24 @@ function renderDarkQuery(item, profile) {
         const yOf = function (v) {
           const vv = Math.max(ymin, Math.min(ymax, Number(v)));
           const y = pad.t + (1 - (vv - ymin) / (ymax - ymin)) * H;
-          // 再内缩 1px，避免描边被画布上/下边缘裁掉
           return Math.max(pad.t + 1, Math.min(pad.t + H - 1, y));
         };
-        const fmtSpd = function (v) {
+        const fmtRatio = function (v) {
           const n = Number(v);
           if (!Number.isFinite(n)) return "—";
-          return (n > 0 ? "+" : "") + Math.round(n).toString();
+          return n.toFixed(2);
         };
 
-        // build polyline with zero-crossing splits for dual-tone
+        // samples with 1.0 crossings for dual-tone split
         const samples = [];
         for (let i = 0; i < pts.length; i++) {
-          samples.push({ i: i, v: Number(pts[i]._spd), x: xOf(i), y: yOf(Number(pts[i]._spd)), t: pts[i].t || "" });
+          samples.push({ v: Number(pts[i]._ratio), x: xOf(i), y: yOf(Number(pts[i]._ratio)) });
           if (i < pts.length - 1) {
-            const v0 = Number(pts[i]._spd), v1 = Number(pts[i + 1]._spd);
-            if ((v0 > 0 && v1 < 0) || (v0 < 0 && v1 > 0)) {
-              const r = Math.abs(v0) / (Math.abs(v0) + Math.abs(v1));
+            const v0 = Number(pts[i]._ratio), v1 = Number(pts[i + 1]._ratio);
+            if ((v0 > 1 && v1 < 1) || (v0 < 1 && v1 > 1)) {
+              const r = Math.abs(v0 - 1) / (Math.abs(v0 - 1) + Math.abs(v1 - 1));
               const xz = xOf(i) + (xOf(i + 1) - xOf(i)) * r;
-              samples.push({ i: i + r, v: 0, x: xz, y: yOf(0), t: "", z: true });
+              samples.push({ v: 1, x: xz, y: yOf(1), z: true });
             }
           }
         }
@@ -2037,31 +2044,30 @@ function renderDarkQuery(item, profile) {
         ctx.fillStyle = "#fcfdff";
         ctx.fillRect(0, 0, cssW, cssH);
 
-        // zero baseline
-        const y0 = yOf(0);
+        // baseline 1.0 = 与昨持平
+        const y1 = yOf(1);
         ctx.strokeStyle = "#c5ccd6";
         ctx.lineWidth = 1;
         ctx.setLineDash([4, 3]);
         ctx.beginPath();
-        ctx.moveTo(pad.l, y0);
-        ctx.lineTo(pad.l + W, y0);
+        ctx.moveTo(pad.l, y1);
+        ctx.lineTo(pad.l + W, y1);
         ctx.stroke();
         ctx.setLineDash([]);
         ctx.fillStyle = "#9aa3af";
         ctx.font = "10px sans-serif";
         ctx.textAlign = "left";
-        ctx.fillText("0", 4, y0 + 3);
+        ctx.fillText("1.0", 4, y1 + 3);
 
-        // fill bands: above zero red (加速), below zero green (减速)
-        function fillBand(sign) {
+        function fillBand(above) {
           ctx.beginPath();
           let started = false;
           for (let k = 0; k < samples.length; k++) {
             const s = samples[k];
-            const on = sign > 0 ? s.v >= 0 : s.v <= 0;
+            const on = above ? s.v >= 1 : s.v <= 1;
             if (!on) {
               if (started) {
-                ctx.lineTo(s.x, y0);
+                ctx.lineTo(s.x, y1);
                 ctx.closePath();
                 ctx.fill();
                 started = false;
@@ -2070,7 +2076,7 @@ function renderDarkQuery(item, profile) {
               continue;
             }
             if (!started) {
-              ctx.moveTo(s.x, y0);
+              ctx.moveTo(s.x, y1);
               ctx.lineTo(s.x, s.y);
               started = true;
             } else {
@@ -2079,18 +2085,17 @@ function renderDarkQuery(item, profile) {
           }
           if (started) {
             const lastS = samples[samples.length - 1];
-            ctx.lineTo(lastS.x, y0);
+            ctx.lineTo(lastS.x, y1);
             ctx.closePath();
             ctx.fill();
           }
         }
         ctx.fillStyle = "rgba(192,57,43,0.14)";
-        fillBand(1);
+        fillBand(true);
         ctx.fillStyle = "rgba(30,132,73,0.14)";
-        fillBand(-1);
+        fillBand(false);
 
-        // stroke segments by sign
-        function strokeBand(sign, color) {
+        function strokeBand(above, color) {
           ctx.strokeStyle = color;
           ctx.lineWidth = 1.9;
           ctx.lineJoin = "round";
@@ -2099,18 +2104,18 @@ function renderDarkQuery(item, profile) {
           let pen = false;
           for (let k = 0; k < samples.length; k++) {
             const s = samples[k];
-            const on = sign > 0 ? s.v >= 0 : s.v <= 0;
+            const on = above ? s.v >= 1 : s.v <= 1;
             if (!on) { pen = false; continue; }
             if (!pen) { ctx.moveTo(s.x, s.y); pen = true; }
             else ctx.lineTo(s.x, s.y);
           }
           ctx.stroke();
         }
-        strokeBand(1, "#c0392b");
-        strokeBand(-1, "#1e8449");
+        strokeBand(true, "#c0392b");
+        strokeBand(false, "#1e8449");
 
-        const last = Number(pts[pts.length - 1]._spd);
-        const col = last > 1.5 ? "#c0392b" : (last < -1.5 ? "#1e8449" : "#5d6d7e");
+        const last = Number(pts[pts.length - 1]._ratio);
+        const col = last > 1.005 ? "#c0392b" : (last < 0.995 ? "#1e8449" : "#5d6d7e");
         const ex = xOf(pts.length - 1), ey = yOf(last);
         ctx.fillStyle = col;
         ctx.beginPath();
@@ -2128,43 +2133,39 @@ function renderDarkQuery(item, profile) {
         const seen = {};
         labelIdx.forEach(function (i) {
           if (seen[i]) return; seen[i] = 1;
-          const tx = xOf(i);
           const label = pts[i].t || "";
           if (!label) return;
-          // keep labels inside canvas
-          const clampedX = Math.min(cssW - 14, Math.max(pad.l, tx));
-          ctx.fillText(label, clampedX, cssH - 3);
+          const tx = Math.min(cssW - 14, Math.max(pad.l, xOf(i)));
+          ctx.fillText(label, tx, cssH - 3);
         });
 
         // y labels
         ctx.textAlign = "right";
-        ctx.fillText(fmtSpd(ymax), pad.l - 4, pad.t + 9);
-        ctx.fillText(fmtSpd(ymin), pad.l - 4, pad.t + H - 1);
+        ctx.fillText(fmtRatio(ymax), pad.l - 4, pad.t + 9);
+        ctx.fillText(fmtRatio(ymin), pad.l - 4, pad.t + H - 1);
         ctx.textAlign = "left";
 
         if (foot && latest) {
-          const dYi = latest.delta_yi != null ? Number(latest.delta_yi) : NaN;
-          let spdN = latest.speed_yi_10m != null ? Number(latest.speed_yi_10m) : NaN;
-          if (!Number.isFinite(spdN) && pts.length) spdN = Number(pts[pts.length - 1]._spd);
-          const levelLabel = latest.level_label
-            || (Number.isFinite(dYi) ? (dYi > 1 ? "放量" : (dYi < -1 ? "缩量" : "持平")) : "—");
-          const speedLabel = latest.speed_label || (
-            Number.isFinite(spdN)
-              ? (spdN > 1.5 ? "加速" : (spdN < -1.5 ? "减速" : "平稳"))
-              : "—"
+          let rN = latest.pace != null ? Number(latest.pace) : NaN;
+          if (!Number.isFinite(rN) && pts.length) rN = Number(pts[pts.length - 1]._ratio);
+          const dYi = latest.delta_yi != null ? Number(latest.delta_yi) : (
+            Number.isFinite(rN) && latest.prev_yi != null
+              ? (rN - 1) * Number(latest.prev_yi)
+              : NaN
           );
+          const levelLabel = latest.level_label
+            || (Number.isFinite(rN) ? (rN > 1.005 ? "放量" : (rN < 0.995 ? "缩量" : "持平")) : "—");
+          const rCls = Number.isFinite(rN) ? (rN > 1.005 ? "up" : (rN < 0.995 ? "down" : "")) : "";
           const dCls = Number.isFinite(dYi) ? (dYi > 1 ? "up" : (dYi < -1 ? "down" : "")) : "";
-          const sCls = Number.isFinite(spdN) ? (spdN > 1.5 ? "up" : (spdN < -1.5 ? "down" : "")) : "";
+          const rTxt = Number.isFinite(rN)
+            ? (rN.toFixed(3) + "×（" + ((rN - 1) * 100 >= 0 ? "+" : "") + ((rN - 1) * 100).toFixed(1) + "%）")
+            : "—";
           const dTxt = Number.isFinite(dYi)
             ? ((dYi > 0 ? "+" : "") + dYi.toFixed(0) + "亿")
             : "—";
-          const sTxt = Number.isFinite(spdN)
-            ? ((spdN > 0 ? "+" : "") + spdN.toFixed(1) + "亿/10分")
-            : "—";
           foot.innerHTML =
-            '<span class="' + dCls + '">' + levelLabel + " " + dTxt + "</span>"
-            + ' · <span class="' + sCls + '">' + speedLabel + " " + sTxt + "</span>"
-            ;
+            '<span class="' + rCls + '">比值 ' + rTxt + "</span>"
+            + ' · <span class="' + dCls + '">' + levelLabel + " " + dTxt + "</span>";
         }
       })();
 

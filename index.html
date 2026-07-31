@@ -433,31 +433,48 @@
     .overview-card .vol-vs-prev {
       margin-top: auto; padding: 6px 8px; font-size: 13px; border-radius: 6px;
     }
-    /* 沪深京量能：文字再小一点；量能比值图不压高度，略放大 */
+    /* 沪深京量能：表内文字再压缩；量能比值图保持 100px */
     .overview-card .vol-panel {
       padding: 6px 8px;
     }
     .overview-card .vol-panel h3 {
-      margin: 0 0 3px;
+      margin: 0 0 2px;
       font-size: 11px;
     }
     .overview-card .vol-panel h3 .subk {
       font-size: 9px;
     }
     .overview-card .vol-panel .mtable {
-      font-size: 11px;
-      line-height: 1.15;
+      font-size: 10px;
+      line-height: 1.1;
     }
     .overview-card .vol-panel .mtable th,
     .overview-card .vol-panel .mtable td {
-      padding: 1px 2px;
+      padding: 0 2px;
+      line-height: 1.15;
     }
     .overview-card .vol-panel .mtable th {
       font-size: 9px;
       padding-bottom: 1px;
+      font-weight: 600;
     }
     .overview-card .vol-panel .mtable td.b {
-      font-size: 12px;
+      font-size: 11px;
+      font-weight: 700;
+    }
+    .overview-card .vol-panel .mtable .chg {
+      font-size: 9px;
+      font-weight: 600;
+      margin-left: 2px;
+    }
+    .overview-card .vol-panel .mtable .nest {
+      color: #666;
+      font-size: 10px;
+    }
+    .overview-card .vol-panel .mtable .nest-mark {
+      color: #bbb;
+      margin-right: 1px;
+      font-size: 9px;
     }
     .overview-card .vol-panel .vol-vs-prev {
       margin-top: 3px;
@@ -2012,12 +2029,12 @@ function renderMarket(data) {
         const pred = x.predict_amount_yi == null ? "-" : Number(x.predict_amount_yi).toFixed(0);
         const strong = row.strong ? "b" : "";
         const chg = x.change_pct != null
-          ? ' <span class="' + toneClass(x.change_pct) + '" style="font-weight:600">' + fmtPct(x.change_pct) + "</span>"
+          ? ' <span class="chg ' + toneClass(x.change_pct) + '">' + fmtPct(x.change_pct) + "</span>"
           : "";
         const nameHtml = row.indent
-          ? '<span style="color:#999;margin-right:2px">└</span><span style="color:#666">' + row.name + "</span>"
+          ? '<span class="nest-mark">└</span><span class="nest">' + row.name + "</span>"
           : row.name;
-        return "<tr>"
+        return "<tr" + (row.indent ? ' class="vol-nest"' : (row.strong ? ' class="vol-sum"' : "")) + ">"
           + "<td>" + nameHtml + chg + "</td>"
           + '<td class="' + strong + '">' + act + "</td>"
           + '<td class="' + strong + '">' + pred + "</td>"

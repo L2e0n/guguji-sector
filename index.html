@@ -718,16 +718,16 @@
             <div class="limit-box"><span class="k">封板率</span><span class="v" id="limSeal">-</span><span class="s" id="limSealSub">涨停/(涨停+炸板)</span></div>
           </div>
           <div class="limit-tops" id="limitTops">涨停/跌停个股将显示在此</div>
-          <div class="strength-badge" id="strengthBadge" title="开盘啦综合强度分">
+          <div class="strength-badge" id="strengthBadge" title="自研情绪综合强度分（东财数据）">
             <div>
               <div class="sk">综合强度</div>
               <div class="sv" id="strengthVal">—</div>
             </div>
-            <div class="ss" id="strengthSub">开盘啦 · 情绪强度</div>
+            <div class="ss" id="strengthSub">自研 · 情绪强度</div>
           </div>
           <div class="daban-wrap" id="dabanWrap">
             <div class="daban-head">
-              <span class="dh-title">🎯 开盘啦打板</span>
+              <span class="dh-title">🎯 打板观察</span>
               <span class="dh-meta" id="dabanMeta">竞价 / 即将 / 风向标 / 涨停</span>
             </div>
             <div class="daban-seg" id="dabanSeg">
@@ -797,8 +797,8 @@
     </div>
 
     <div class="footer-note">
-      数据来源：量能合计/综合强度=开盘啦（东财/问财兜底）；分市场拆解与板块资金流=东财；涨跌停统计=东财剔ST；打板明细=开盘啦 · 盘中约 12–15 秒缓存<br />
-      预测量能优先开盘啦 MarketCapacity；失败则东财分时占比曲线+自校准外推。信号仅供观察，不构成投资建议
+      数据来源：量能/涨跌停/打板/情绪分=东财公开数据+自研公式（腾讯/新浪兜底）；分市场拆解=上证/科创/深成/创业/北交 · 盘中约 12–15 秒缓存<br />
+      预测量能=近3日同时点绝对基准外推并与今日分时自校准混合。信号仅供观察，不构成投资建议
     </div>
 
     </div><!-- /pageSector -->
@@ -2419,7 +2419,7 @@ function renderMarket(data) {
       if (dnTop.length) tops.push("<b>跌停</b> " + dnTop.join("、"));
       $("limitTops").innerHTML = tops.join("<br>") || "暂无涨跌停明细";
 
-      // 综合强度（开盘啦）
+      // 综合强度（自研）
       (function renderStrength() {
         const st = data.strength || {};
         const valEl = $("strengthVal");
@@ -2429,17 +2429,18 @@ function renderMarket(data) {
         if (!Number.isFinite(strong)) {
           valEl.textContent = "—";
           valEl.className = "sv";
-          if (subEl) subEl.textContent = st.error ? ("开盘啦 · " + String(st.error).slice(0, 28)) : "开盘啦 · 暂无强度";
+          if (subEl) subEl.textContent = st.error ? ("自研 · " + String(st.error).slice(0, 28)) : "自研 · 暂无强度";
           return;
         }
         valEl.textContent = String(Math.round(strong * 10) / 10);
-        valEl.className = "sv " + (strong >= 70 ? "high" : (strong >= 45 ? "mid" : "low"));
+        valEl.className = "sv " + (strong >= 75 ? "high" : (strong <= 25 ? "low" : "mid"));
         const bits = [];
         if (st.ztjs != null) bits.push("涨停" + st.ztjs);
         if (st.lbgd != null) bits.push("高度" + st.lbgd);
-        if (st.df_num != null) bits.push("跌停相关" + st.df_num);
-        if (data.volume_primary) bits.push("量能:" + data.volume_primary);
-        if (subEl) subEl.textContent = (bits.join(" · ") || "开盘啦 · 情绪强度") + (st.day ? " · " + String(st.day).slice(0, 10) : "");
+        if (st.df_num != null) bits.push("炸板" + st.df_num);
+        if (st.band_label) bits.push(String(st.band_label));
+        if (st.source) bits.push(st.source === "self" ? "自研" : String(st.source));
+        if (subEl) subEl.textContent = (bits.join(" · ") || "自研 · 情绪强度") + (st.day ? " · " + String(st.day).slice(0, 10) : "");
       })();
 
       state._dabanLast = data.daban || null;
@@ -2479,7 +2480,7 @@ function renderMarket(data) {
           + (tab.count != null ? " · " + tab.count + "只" : (items.length ? " · " + items.length + "只" : ""));
       }
       if (!items.length) {
-        box.innerHTML = '<div style="color:#999;padding:4px 0">' + (tab.error || db.error || "暂无打板数据（休市或接口占位）") + "</div>";
+        box.innerHTML = '<div style="color:#999;padding:4px 0">' + (tab.error || db.error || "暂无打板数据（休市或东财池为空）") + "</div>";
         return;
       }
       box.innerHTML = items.slice(0, 15).map(function (x) {

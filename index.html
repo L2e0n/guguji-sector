@@ -780,9 +780,9 @@
 <body>
   <div id="authGate" class="auth-gate" aria-hidden="true">
     <div class="auth-card">
-      <h2>🥁 资金流向 · 访问验证</h2>
-      <div class="sub">该页面需要访问口令。验证通过后 7 天内免登录（本机浏览器）。</div>
-      <input id="authPassword" type="password" placeholder="请输入访问口令" autocomplete="current-password" />
+      <h2>🥁 私人页面</h2>
+      <div class="sub">输入口令后进入，本机会自动记住，一般不用反复登录。</div>
+      <input id="authPassword" type="password" placeholder="访问口令" autocomplete="current-password" />
       <div class="auth-err" id="authErr"></div>
       <div class="auth-row">
         <button type="button" class="btn" id="authSubmitBtn">进入</button>
@@ -792,7 +792,7 @@
   <div class="app" id="mainApp">
     <div class="header">
       <a class="home-link" href="https://guguji.icu" title="返回主页">← 返回主页</a>
-      <button type="button" class="auth-logout" id="authLogoutBtn" title="退出登录" style="display:none">退出</button>
+      <button type="button" class="auth-logout" id="authLogoutBtn" title="清除本机登录" style="display:none;opacity:.7">退出</button>
       <h1>🥁 资金流向</h1>
       <div class="sub" id="pageSub" style="display:none"></div>
     </div>

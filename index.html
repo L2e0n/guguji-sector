@@ -481,6 +481,10 @@
     .day-picker {
       display: inline-flex; align-items: center; gap: 6px; position: relative;
       flex-wrap: wrap;
+      margin-left: auto; /* 工具栏最右侧 */
+    }
+    .toolbar .day-picker .cal-pop {
+      left: auto; right: 0; /* 右对齐弹出，避免溢出视口 */
     }
     .day-picker .cal-wrap { position: relative; }
     .day-picker .cal-trigger {
@@ -747,20 +751,16 @@
     <div class="header">
       <a class="home-link" href="https://guguji.icu" title="返回主页">← 返回主页</a>
       <h1>🐔 资金流向</h1>
-      <div class="sub" id="pageSub">
-        实时识别 A 股行业 / 概念板块主力资金流向（东财口径）。盘中自动刷新，点击板块可下钻成分股。
-      </div>
+      <div class="sub" id="pageSub" style="display:none"></div>
     </div>
 
 
     <div class="page-tabs" id="pageTabs">
       <button type="button" class="page-tab active" data-page="sector">
         📡 资金流向
-        <small>东财行业/概念/地区</small>
       </button>
       <button type="button" class="page-tab" data-page="dark">
         🕵️ 暗盘资金
-        <small>问财暗盘 / 明盘 / DDE</small>
       </button>
     </div>
 
@@ -776,6 +776,8 @@
         <button type="button" class="btn secondary" data-period="5">5日</button>
         <button type="button" class="btn secondary" data-period="10">10日</button>
       </div>
+      <button id="refreshBtn" class="btn" type="button">刷新</button>
+      <button id="autoBtn" class="btn secondary" type="button">自动刷新：开</button>
       <div class="day-picker" id="dayPicker" title="历史快照（自 2026-07-31）">
         <button type="button" class="btn active" data-day="" id="dayLiveBtn">实时</button>
         <div class="cal-wrap">
@@ -796,8 +798,6 @@
           </div>
         </div>
       </div>
-      <button id="refreshBtn" class="btn" type="button">刷新</button>
-      <button id="autoBtn" class="btn secondary" type="button">自动刷新：开</button>
     </div>
 
     <div class="meta-row">
@@ -961,6 +961,7 @@
           <button type="button" class="btn secondary" data-sort="light_in">明盘流入</button>
           <button type="button" class="btn secondary" data-sort="light_out">明盘流出</button>
         </div>
+        <button id="darkRefreshBtn" class="btn" type="button">刷新榜单</button>
         <div class="day-picker" id="darkDayPicker" title="暗盘历史快照">
           <button type="button" class="btn active" data-day="" id="darkDayLiveBtn">实时</button>
           <div class="cal-wrap">
@@ -981,7 +982,6 @@
             </div>
           </div>
         </div>
-        <button id="darkRefreshBtn" class="btn" type="button">刷新榜单</button>
       </div>
 
       <div class="card">
@@ -1011,8 +1011,7 @@
       </div>
 
       <div class="footer-note">
-        数据来源：同花顺问财 OpenAPI（hithink-market-query）· 暗盘为日级累计盘中刷新<br />
-        明盘口径取问财「主力资金流向」字段 · DDX/DDY/DDZ 为 DDE 决策指标 · 仅供观察
+        信号仅供观察，不构成投资建议
       </div>
     </div>
 
@@ -1436,10 +1435,10 @@
         btn.classList.toggle("active", btn.getAttribute("data-page") === page);
       });
       if (page === "sector") {
-        $("pageSub").textContent = "实时识别 A 股行业 / 概念板块主力资金流向（东财口径）。盘中自动刷新，点击板块可下钻成分股。";
+        if ($("pageSub")) $("pageSub").textContent = "";
         document.title = "资金流向 · 咕咕鸡";
       } else {
-        $("pageSub").textContent = "同花顺问财暗盘 / 明盘主力资金与 DDE（DDX/DDY/DDZ）。支持榜单与个股查询。";
+        if ($("pageSub")) $("pageSub").textContent = "";
         document.title = "暗盘资金 · 咕咕鸡";
         if (!state.darkLoaded) refreshDark(true);
       }

@@ -149,7 +149,7 @@
     }
     .vol-pace-foot .up { color: #c0392b; font-weight: 700; }
     .vol-pace-foot .down { color: #1e8449; font-weight: 700; }
-    .overview-card .vol-panel { overflow: visible !important; min-height: auto !important; height: auto !important; align-self: start; max-height: none !important; }
+    .overview-card .vol-panel { overflow: visible !important; min-height: auto !important; height: auto !important; align-self: stretch; max-height: none !important; }
     .overview-card .vol-pace-wrap { flex: 0 0 auto; }
 
     .vol-vs-prev.expand { color: #c0392b; background: #fdecea; }
@@ -478,6 +478,86 @@
     .day-seg { flex-wrap: wrap; }
     .day-seg .btn { font-size: 12px; padding: 6px 10px; }
     .day-seg .btn.hist { opacity: 0.95; }
+    .day-picker {
+      display: inline-flex; align-items: center; gap: 6px; position: relative;
+      flex-wrap: wrap;
+    }
+    .day-picker .cal-wrap { position: relative; }
+    .day-picker .cal-trigger {
+      font-size: 12px; padding: 6px 10px; min-width: 108px;
+      display: inline-flex; align-items: center; justify-content: center; gap: 4px;
+    }
+    .day-picker .cal-trigger.has-day {
+      background: linear-gradient(180deg, #fff8d6, #ffe58a);
+      border-color: #f0c000; font-weight: 700;
+    }
+    .cal-pop {
+      position: absolute; top: calc(100% + 6px); left: 0; z-index: 40;
+      width: 268px; background: #fff; border: 1px solid #f0d88a;
+      border-radius: 12px; box-shadow: 0 10px 28px rgba(0,0,0,.12);
+      padding: 10px; box-sizing: border-box;
+    }
+    .cal-pop.hidden { display: none !important; }
+    .cal-nav {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: 8px; gap: 6px;
+    }
+    .cal-nav .cal-month {
+      font-size: 13px; font-weight: 800; color: var(--secondary);
+      font-variant-numeric: tabular-nums;
+    }
+    .cal-nav-btn {
+      border: 1px solid #eee; background: #fafafa; border-radius: 8px;
+      width: 30px; height: 28px; cursor: pointer; font-size: 16px; color: #555;
+      line-height: 1;
+    }
+    .cal-nav-btn:hover { border-color: #f0c000; background: #fff8d6; }
+    .cal-week {
+      display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px;
+      text-align: center; font-size: 10px; color: #999; margin-bottom: 4px;
+    }
+    .cal-grid {
+      display: grid; grid-template-columns: repeat(7, 1fr); gap: 3px;
+    }
+    .cal-cell {
+      border: 0; background: transparent; border-radius: 8px;
+      height: 30px; font-size: 12px; color: #333; cursor: pointer;
+      font-variant-numeric: tabular-nums;
+    }
+    .cal-cell.muted { color: #ccc; cursor: default; }
+    .cal-cell.disabled { color: #ddd; cursor: not-allowed; background: #fafafa; }
+    .cal-cell.has-data { background: #fff8e6; color: #333; font-weight: 600; }
+    .cal-cell.has-data:hover { background: #ffe58a; }
+    .cal-cell.active {
+      background: linear-gradient(180deg, #fff3b0, #ffd54f);
+      border: 1px solid #f0c000; font-weight: 800;
+    }
+    .cal-cell.today-mark { box-shadow: inset 0 0 0 1px #f0c000; }
+    .cal-foot { margin-top: 8px; display: flex; justify-content: flex-end; }
+    .cal-foot .btn { font-size: 11px; padding: 4px 10px; }
+    .etf-head .etf-desc {
+      display: inline; font-size: 11px; font-weight: 500; color: var(--muted);
+      margin-left: 6px;
+    }
+    @media (max-width: 640px) {
+      .etf-head .etf-desc { display: block; margin: 2px 0 0; line-height: 1.35; }
+    }
+    /* 右侧涨跌停列高度贴齐左侧量能，打板列表内部滚动 */
+    .overview-card .limit-panel {
+      display: flex; flex-direction: column; min-height: 0;
+      overflow: hidden; height: 100%; max-height: 100%;
+      align-self: stretch; box-sizing: border-box;
+    }
+    .overview-card .limit-panel .daban-wrap {
+      flex: 1 1 auto; min-height: 0; margin-top: 8px; padding-top: 8px;
+      display: flex; flex-direction: column; overflow: hidden;
+    }
+    .overview-card .limit-panel .daban-head,
+    .overview-card .limit-panel .daban-seg { flex: 0 0 auto; }
+    .overview-card .limit-panel .daban-list {
+      flex: 1 1 auto; min-height: 80px; max-height: none !important;
+      overflow: auto;
+    }
     .limit-panel .limit-stats {
       grid-template-columns: repeat(5, minmax(0, 1fr));
       gap: 6px;
@@ -520,7 +600,7 @@
       height: auto !important;
       max-height: none !important;
       overflow: visible !important;
-      align-self: start;
+      align-self: stretch;
     }
     .overview-card .vol-panel h3 {
       margin: 0 0 6px;
@@ -696,8 +776,25 @@
         <button type="button" class="btn secondary" data-period="5">5日</button>
         <button type="button" class="btn secondary" data-period="10">10日</button>
       </div>
-      <div class="seg day-seg" id="daySeg" title="历史快照（自 2026-07-31）">
-        <button type="button" class="btn active" data-day="">实时</button>
+      <div class="day-picker" id="dayPicker" title="历史快照（自 2026-07-31）">
+        <button type="button" class="btn active" data-day="" id="dayLiveBtn">实时</button>
+        <div class="cal-wrap">
+          <button type="button" class="btn secondary cal-trigger" id="dayCalBtn" title="选择有快照的交易日">
+            <span id="dayCalLabel">📅 选日</span>
+          </button>
+          <div class="cal-pop hidden" id="dayCalPop" role="dialog" aria-label="历史日期">
+            <div class="cal-nav">
+              <button type="button" class="cal-nav-btn" id="dayCalPrev" aria-label="上一月">‹</button>
+              <span class="cal-month" id="dayCalMonth">—</span>
+              <button type="button" class="cal-nav-btn" id="dayCalNext" aria-label="下一月">›</button>
+            </div>
+            <div class="cal-week"><span>日</span><span>一</span><span>二</span><span>三</span><span>四</span><span>五</span><span>六</span></div>
+            <div class="cal-grid" id="dayCalGrid"></div>
+            <div class="cal-foot">
+              <button type="button" class="btn secondary" id="dayCalLive">回到实时</button>
+            </div>
+          </div>
+        </div>
       </div>
       <button id="refreshBtn" class="btn" type="button">刷新</button>
       <button id="autoBtn" class="btn secondary" type="button">自动刷新：开</button>
@@ -716,13 +813,12 @@
       </div>
       <div class="etf-flow-row" id="etfFlowRow">
         <div class="etf-head">
-          <span>🧱 宽基ETF资金</span>
+          <span>🧱 宽基ETF资金 <span class="etf-desc">宽基场内ETF主力净流入加总（超大+大单，非申赎；同指数多产品重叠）</span></span>
           <span class="subk" id="structMeta">场内主力 · 亿元</span>
         </div>
         <div class="structure-grid" id="structGrid">
           <!-- filled by renderStructure -->
         </div>
-        <div class="structure-note" id="structNote">宽基场内ETF主力净流入加总（超大+大单，非申赎；同指数多产品重叠）</div>
       </div>
 
       <div class="overview-main">
@@ -852,8 +948,7 @@
     </div>
 
     <div class="footer-note">
-      数据来源：量能/涨跌停/打板/情绪分=东财公开数据+自研公式（腾讯/新浪兜底）；分市场拆解=上证/科创/深成/创业/北交 · 盘中约 12–15 秒缓存<br />
-      预测量能=近3日同时点绝对基准外推并与今日分时自校准混合。信号仅供观察，不构成投资建议
+      信号仅供观察，不构成投资建议
     </div>
 
     </div><!-- /pageSector -->
@@ -866,8 +961,25 @@
           <button type="button" class="btn secondary" data-sort="light_in">明盘流入</button>
           <button type="button" class="btn secondary" data-sort="light_out">明盘流出</button>
         </div>
-        <div class="seg day-seg" id="darkDaySeg" title="暗盘历史快照">
-          <button type="button" class="btn active" data-day="">实时</button>
+        <div class="day-picker" id="darkDayPicker" title="暗盘历史快照">
+          <button type="button" class="btn active" data-day="" id="darkDayLiveBtn">实时</button>
+          <div class="cal-wrap">
+            <button type="button" class="btn secondary cal-trigger" id="darkDayCalBtn" title="选择有快照的交易日">
+              <span id="darkDayCalLabel">📅 选日</span>
+            </button>
+            <div class="cal-pop hidden" id="darkDayCalPop" role="dialog" aria-label="暗盘历史日期">
+              <div class="cal-nav">
+                <button type="button" class="cal-nav-btn" id="darkDayCalPrev" aria-label="上一月">‹</button>
+                <span class="cal-month" id="darkDayCalMonth">—</span>
+                <button type="button" class="cal-nav-btn" id="darkDayCalNext" aria-label="下一月">›</button>
+              </div>
+              <div class="cal-week"><span>日</span><span>一</span><span>二</span><span>三</span><span>四</span><span>五</span><span>六</span></div>
+              <div class="cal-grid" id="darkDayCalGrid"></div>
+              <div class="cal-foot">
+                <button type="button" class="btn secondary" id="darkDayCalLive">回到实时</button>
+              </div>
+            </div>
+          </div>
         </div>
         <button id="darkRefreshBtn" class="btn" type="button">刷新榜单</button>
       </div>
@@ -942,6 +1054,8 @@
       _trendHover: null,
       _inflight: {},
       _lastOkAt: {},
+      _calYm: {},
+      _limitRo: null,
     };
 
     const $ = (id) => document.getElementById(id);
@@ -971,24 +1085,193 @@
         el.classList.add("hidden");
       }
     }
-    function renderDaySeg(rootId, days, selectedDay) {
-      const root = $(rootId);
-      if (!root) return;
-      const rows = Array.isArray(days) ? days : [];
-      const seen = new Set();
-      let html = '<button type="button" class="btn' + (!selectedDay ? ' active' : ' secondary') + '" data-day="">实时</button>';
-      rows.forEach((row) => {
+    function daySetFromRows(days) {
+      const set = new Set();
+      (Array.isArray(days) ? days : []).forEach((row) => {
         const d = (row && row.day) ? String(row.day).slice(0, 10) : "";
-        if (!d || seen.has(d)) return;
-        seen.add(d);
-        const on = selectedDay === d;
-        html += '<button type="button" class="btn hist' + (on ? ' active' : ' secondary') + '" data-day="' + d + '">' + shortDayLabel(d) + '</button>';
+        if (d) set.add(d);
       });
-      root.innerHTML = html;
+      return set;
+    }
+    function ymAdd(ym, delta) {
+      const [y, m] = ym.split("-").map(Number);
+      const dt = new Date(y, m - 1 + delta, 1);
+      return dt.getFullYear() + "-" + String(dt.getMonth() + 1).padStart(2, "0");
+    }
+    function defaultCalYm(days, selectedDay) {
+      if (selectedDay && String(selectedDay).length >= 7) return String(selectedDay).slice(0, 7);
+      const rows = Array.isArray(days) ? days : [];
+      if (rows.length && rows[0] && rows[0].day) return String(rows[0].day).slice(0, 7);
+      const t = new Date();
+      return t.getFullYear() + "-" + String(t.getMonth() + 1).padStart(2, "0");
+    }
+    function renderCalendar(cfg) {
+      // cfg: { prefix, days, selectedDay, liveBtnId, labelId, monthId, gridId, triggerId }
+      const days = cfg.days || [];
+      const selectedDay = cfg.selectedDay || null;
+      const available = daySetFromRows(days);
+      const start = state.historyStart || "2026-07-31";
+      if (!state._calYm) state._calYm = {};
+      if (!state._calYm[cfg.prefix]) state._calYm[cfg.prefix] = defaultCalYm(days, selectedDay);
+      const ym = state._calYm[cfg.prefix];
+      const monthEl = $(cfg.monthId);
+      if (monthEl) monthEl.textContent = ym;
+      const liveBtn = $(cfg.liveBtnId);
+      if (liveBtn) {
+        liveBtn.classList.toggle("active", !selectedDay);
+        liveBtn.classList.toggle("secondary", !!selectedDay);
+      }
+      const label = $(cfg.labelId);
+      const trigger = $(cfg.triggerId);
+      if (label) label.textContent = selectedDay ? ("📅 " + shortDayLabel(selectedDay)) : "📅 选日";
+      if (trigger) trigger.classList.toggle("has-day", !!selectedDay);
+      const grid = $(cfg.gridId);
+      if (!grid) return;
+      const [yy, mm] = ym.split("-").map(Number);
+      const first = new Date(yy, mm - 1, 1);
+      const startPad = first.getDay(); // 0=Sun
+      const daysInMonth = new Date(yy, mm, 0).getDate();
+      const today = new Date();
+      const todayStr = today.getFullYear() + "-" + String(today.getMonth() + 1).padStart(2, "0") + "-" + String(today.getDate()).padStart(2, "0");
+      let html = "";
+      for (let i = 0; i < startPad; i++) html += '<button type="button" class="cal-cell muted" tabindex="-1" disabled></button>';
+      for (let d = 1; d <= daysInMonth; d++) {
+        const ds = yy + "-" + String(mm).padStart(2, "0") + "-" + String(d).padStart(2, "0");
+        const has = available.has(ds);
+        const beforeStart = ds < start;
+        let cls = "cal-cell";
+        if (beforeStart || !has) cls += " disabled";
+        else cls += " has-data";
+        if (selectedDay === ds) cls += " active";
+        if (ds === todayStr) cls += " today-mark";
+        const dis = (beforeStart || !has) ? " disabled" : "";
+        html += '<button type="button" class="' + cls + '" data-day="' + ds + '"' + dis + ">" + d + "</button>";
+      }
+      grid.innerHTML = html;
+    }
+    function renderDayPicker() {
+      renderCalendar({
+        prefix: "sector",
+        days: state.historyDays,
+        selectedDay: state.historyDay,
+        liveBtnId: "dayLiveBtn",
+        labelId: "dayCalLabel",
+        monthId: "dayCalMonth",
+        gridId: "dayCalGrid",
+        triggerId: "dayCalBtn",
+      });
+    }
+    function renderDarkDayPicker() {
+      renderCalendar({
+        prefix: "dark",
+        days: state.darkHistoryDays,
+        selectedDay: state.darkHistoryDay,
+        liveBtnId: "darkDayLiveBtn",
+        labelId: "darkDayCalLabel",
+        monthId: "darkDayCalMonth",
+        gridId: "darkDayCalGrid",
+        triggerId: "darkDayCalBtn",
+      });
+    }
+    function closeAllCalPops(exceptId) {
+      ["dayCalPop", "darkDayCalPop"].forEach((id) => {
+        if (exceptId && id === exceptId) return;
+        const el = $(id);
+        if (el) el.classList.add("hidden");
+      });
+    }
+    function setSectorHistoryDay(d) {
+      state.historyDay = d || null;
+      renderDayPicker();
+      updateHistoryBanner();
+      closeAllCalPops();
+      state.openCode = null;
+      refresh(true);
+    }
+    function setDarkHistoryDay(d) {
+      state.darkHistoryDay = d || null;
+      renderDarkDayPicker();
+      closeAllCalPops();
+      refreshDark(true);
+    }
+    function syncLimitPanelHeight() {
+      const vol = document.querySelector(".overview-card .vol-panel");
+      const lim = document.querySelector(".overview-card .limit-panel");
+      if (!vol || !lim) return;
+      const wide = window.matchMedia("(min-width: 720px)").matches;
+      if (!wide) {
+        lim.style.maxHeight = "";
+        lim.style.height = "";
+        return;
+      }
+      // 右列高度贴齐左列（量能），避免打板列表把整卡撑高
+      const h = Math.round(vol.getBoundingClientRect().height);
+      if (h > 40) {
+        lim.style.maxHeight = h + "px";
+        lim.style.height = h + "px";
+      }
+    }
+    function bindLimitHeightSync() {
+      const vol = document.querySelector(".overview-card .vol-panel");
+      if (!vol || typeof ResizeObserver === "undefined") {
+        window.addEventListener("resize", syncLimitPanelHeight);
+        return;
+      }
+      if (state._limitRo) return;
+      state._limitRo = new ResizeObserver(() => {
+        window.requestAnimationFrame(syncLimitPanelHeight);
+      });
+      state._limitRo.observe(vol);
+      window.addEventListener("resize", syncLimitPanelHeight);
+      syncLimitPanelHeight();
+    }
+    // legacy alias: old day-seg renderer -> calendar
+    function renderDaySeg(rootId, days, selectedDay) {
+      if (rootId === "daySeg" || rootId === "dayPicker") {
+        state.historyDays = days || state.historyDays;
+        if (selectedDay !== undefined) state.historyDay = selectedDay;
+        renderDayPicker();
+      } else if (rootId === "darkDaySeg" || rootId === "darkDayPicker") {
+        state.darkHistoryDays = days || state.darkHistoryDays;
+        if (selectedDay !== undefined) state.darkHistoryDay = selectedDay;
+        renderDarkDayPicker();
+      }
     }
     async function loadHistoryDays() {
+      // 资金流向页：优先联合日历；nginx 未放行 /api/history 时回退 sector 分 kind
       try {
-        const data = await fetchJson(API_BASE + "/api/history/days?limit=60", { timeoutMs: 12000, retries: 1 });
+        let data = null;
+        try {
+          data = await fetchJson(API_BASE + "/api/history/days?limit=60", { timeoutMs: 12000, retries: 1 });
+        } catch (e0) {
+          data = null;
+        }
+        if (!(data && data.ok)) {
+          const kinds = ["sector_dual", "market", "structure"];
+          const merged = {};
+          for (const kind of kinds) {
+            try {
+              const part = await fetchJson(API_BASE + "/api/sector/history/days?kind=" + encodeURIComponent(kind) + "&limit=60", { timeoutMs: 12000, retries: 1 });
+              if (!(part && part.ok)) continue;
+              if (part.start) state.historyStart = part.start;
+              (part.days || []).forEach(function (row) {
+                const d = row && row.day ? String(row.day).slice(0, 10) : "";
+                if (!d) return;
+                const cur = merged[d] || { day: d, kinds: [], asof: null, updated_at: 0 };
+                if (row.asof && (!cur.asof || String(row.asof) > String(cur.asof))) cur.asof = row.asof;
+                const u = Number(row.updated_at || 0) || 0;
+                if (u >= (cur.updated_at || 0)) cur.updated_at = u;
+                if (cur.kinds.indexOf(kind) < 0) cur.kinds.push(kind);
+                merged[d] = cur;
+              });
+            } catch (e1) {}
+          }
+          data = {
+            ok: true,
+            start: state.historyStart,
+            days: Object.keys(merged).sort().reverse().map(function (k) { return merged[k]; }),
+          };
+        }
         if (data && data.ok) {
           state.historyDays = data.days || [];
           if (data.start) state.historyStart = data.start;
@@ -2157,10 +2440,6 @@ function renderDarkQuery(item, profile) {
           $("structMeta").textContent = "场内主力 · 亿元 · " + nOk + "组"
             + (struct.stale ? " · 缓存" : "");
         }
-        if ($("structNote")) {
-          $("structNote").textContent = struct.disclaimer
-            || "宽基场内ETF主力净流入加总（超大+大单，非申赎；同指数多产品重叠）";
-        }
         return;
       }
 
@@ -2175,10 +2454,6 @@ function renderDarkQuery(item, profile) {
         grid.innerHTML = parts.join("");
       }
       if ($("structMeta")) $("structMeta").textContent = "亿元";
-      if ($("structNote")) {
-        $("structNote").textContent = struct.disclaimer
-          || "主力=超大+大单，散户=小单，均为规模代理。";
-      }
     }
 
 function renderMarket(data) {
@@ -2554,6 +2829,7 @@ function renderMarket(data) {
 
       state._dabanLast = data.daban || null;
       renderDaban(state.dabanTab || "auction");
+      try { syncLimitPanelHeight(); } catch (e) {}
 
     }
 
@@ -2589,7 +2865,8 @@ function renderMarket(data) {
           + (tab.count != null ? " · " + tab.count + "只" : (items.length ? " · " + items.length + "只" : ""));
       }
       if (!items.length) {
-        box.innerHTML = '<div style="color:#999;padding:4px 0">' + (tab.error || db.error || "暂无打板数据（休市或东财池为空）") + "</div>";
+        box.innerHTML = '<div style="color:#999;padding:4px 0">' + (tab.error || db.error || "暂无打板数据（休市或主题池为空）") + "</div>";
+        try { syncLimitPanelHeight(); } catch (e) {}
         return;
       }
       box.innerHTML = items.map(function (x) {
@@ -2609,6 +2886,7 @@ function renderMarket(data) {
           + '<div class="dr">' + right + "</div>"
           + "</div>";
       }).join("");
+      try { syncLimitPanelHeight(); } catch (e) {}
     }
 
     async function refreshMarket(manual) {
@@ -2677,6 +2955,7 @@ function renderMarket(data) {
         if (!k) return;
         state.dabanTab = k;
         renderDaban(k);
+        try { syncLimitPanelHeight(); } catch (e) {}
       });
     }
 
@@ -2696,28 +2975,109 @@ function renderMarket(data) {
       if (e.key === "Escape") clearDarkQuery({ clearInput: true });
     });
 
-    if ($("daySeg")) {
-      $("daySeg").addEventListener("click", (e) => {
-        const btn = e.target.closest("button[data-day]");
-        if (!btn) return;
-        const d = btn.getAttribute("data-day") || "";
-        state.historyDay = d || null;
-        renderDaySeg("daySeg", state.historyDays, state.historyDay);
-        updateHistoryBanner();
-        state.openCode = null;
-        refresh(true);
+    // 资金流向 · 日历历史日
+    if ($("dayLiveBtn")) {
+      $("dayLiveBtn").addEventListener("click", () => setSectorHistoryDay(null));
+    }
+    if ($("dayCalBtn")) {
+      $("dayCalBtn").addEventListener("click", (e) => {
+        e.stopPropagation();
+        const pop = $("dayCalPop");
+        if (!pop) return;
+        const open = pop.classList.contains("hidden");
+        closeAllCalPops();
+        if (open) {
+          state._calYm = state._calYm || {};
+          state._calYm.sector = defaultCalYm(state.historyDays, state.historyDay);
+          renderDayPicker();
+          pop.classList.remove("hidden");
+        }
       });
     }
-    if ($("darkDaySeg")) {
-      $("darkDaySeg").addEventListener("click", (e) => {
-        const btn = e.target.closest("button[data-day]");
-        if (!btn) return;
-        const d = btn.getAttribute("data-day") || "";
-        state.darkHistoryDay = d || null;
-        renderDaySeg("darkDaySeg", state.darkHistoryDays, state.darkHistoryDay);
-        refreshDark(true);
+    if ($("dayCalPrev")) {
+      $("dayCalPrev").addEventListener("click", (e) => {
+        e.stopPropagation();
+        state._calYm = state._calYm || {};
+        state._calYm.sector = ymAdd(state._calYm.sector || defaultCalYm(state.historyDays, state.historyDay), -1);
+        renderDayPicker();
       });
     }
+    if ($("dayCalNext")) {
+      $("dayCalNext").addEventListener("click", (e) => {
+        e.stopPropagation();
+        state._calYm = state._calYm || {};
+        state._calYm.sector = ymAdd(state._calYm.sector || defaultCalYm(state.historyDays, state.historyDay), 1);
+        renderDayPicker();
+      });
+    }
+    if ($("dayCalGrid")) {
+      $("dayCalGrid").addEventListener("click", (e) => {
+        const btn = e.target.closest("button.cal-cell[data-day]");
+        if (!btn || btn.disabled) return;
+        const d = btn.getAttribute("data-day") || "";
+        if (!d) return;
+        setSectorHistoryDay(d);
+      });
+    }
+    if ($("dayCalLive")) {
+      $("dayCalLive").addEventListener("click", () => setSectorHistoryDay(null));
+    }
+
+    // 暗盘 · 日历历史日
+    if ($("darkDayLiveBtn")) {
+      $("darkDayLiveBtn").addEventListener("click", () => setDarkHistoryDay(null));
+    }
+    if ($("darkDayCalBtn")) {
+      $("darkDayCalBtn").addEventListener("click", (e) => {
+        e.stopPropagation();
+        const pop = $("darkDayCalPop");
+        if (!pop) return;
+        const open = pop.classList.contains("hidden");
+        closeAllCalPops();
+        if (open) {
+          state._calYm = state._calYm || {};
+          state._calYm.dark = defaultCalYm(state.darkHistoryDays, state.darkHistoryDay);
+          renderDarkDayPicker();
+          pop.classList.remove("hidden");
+        }
+      });
+    }
+    if ($("darkDayCalPrev")) {
+      $("darkDayCalPrev").addEventListener("click", (e) => {
+        e.stopPropagation();
+        state._calYm = state._calYm || {};
+        state._calYm.dark = ymAdd(state._calYm.dark || defaultCalYm(state.darkHistoryDays, state.darkHistoryDay), -1);
+        renderDarkDayPicker();
+      });
+    }
+    if ($("darkDayCalNext")) {
+      $("darkDayCalNext").addEventListener("click", (e) => {
+        e.stopPropagation();
+        state._calYm = state._calYm || {};
+        state._calYm.dark = ymAdd(state._calYm.dark || defaultCalYm(state.darkHistoryDays, state.darkHistoryDay), 1);
+        renderDarkDayPicker();
+      });
+    }
+    if ($("darkDayCalGrid")) {
+      $("darkDayCalGrid").addEventListener("click", (e) => {
+        const btn = e.target.closest("button.cal-cell[data-day]");
+        if (!btn || btn.disabled) return;
+        const d = btn.getAttribute("data-day") || "";
+        if (!d) return;
+        setDarkHistoryDay(d);
+      });
+    }
+    if ($("darkDayCalLive")) {
+      $("darkDayCalLive").addEventListener("click", () => setDarkHistoryDay(null));
+    }
+    document.addEventListener("click", (e) => {
+      if (e.target.closest(".day-picker")) return;
+      closeAllCalPops();
+    });
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "Escape") closeAllCalPops();
+    });
+    bindLimitHeightSync();
 
     $("typeSeg").addEventListener("click", (e) => {
       const btn = e.target.closest("button[data-type]");

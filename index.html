@@ -750,7 +750,7 @@
   <div class="app">
     <div class="header">
       <a class="home-link" href="https://guguji.icu" title="返回主页">← 返回主页</a>
-      <h1>🐔 资金流向</h1>
+      <h1>🥁 资金流向</h1>
       <div class="sub" id="pageSub" style="display:none"></div>
     </div>
 
@@ -770,11 +770,6 @@
         <button type="button" class="btn active" data-type="industry">行业</button>
         <button type="button" class="btn secondary" data-type="concept">概念</button>
         <button type="button" class="btn secondary" data-type="region">地区</button>
-      </div>
-      <div class="seg" id="periodSeg">
-        <button type="button" class="btn active" data-period="1">今日</button>
-        <button type="button" class="btn secondary" data-period="5">5日</button>
-        <button type="button" class="btn secondary" data-period="10">10日</button>
       </div>
       <button id="refreshBtn" class="btn" type="button">刷新</button>
       <button id="autoBtn" class="btn secondary" type="button">自动刷新：开</button>
@@ -1024,7 +1019,7 @@
 
     const state = {
       type: "industry",
-      period: "1",
+      period: "1", // 仅今日；已去掉 5/10 日切换
       top: 20,
       auto: true,
       timer: null,
@@ -2081,18 +2076,34 @@ function renderDarkQuery(item, profile) {
       const W = cssW - pad.l - pad.r;
       const H = cssH - pad.t - pad.b;
 
-      let ymin = 0, ymax = 0;
+      // 纵坐标：以各序列开盘首点均值为中线，上下对称展示流入/流出
+      const vals = [];
+      const opens = [];
       series.forEach((s) => {
-        (s.points || []).forEach((p) => {
+        const pts = s.points || [];
+        let first = null;
+        pts.forEach((p) => {
           const v = Number(p.main_net_yi);
           if (!Number.isFinite(v)) return;
-          ymin = Math.min(ymin, v);
-          ymax = Math.max(ymax, v);
+          vals.push(v);
+          if (first == null) first = v;
         });
+        if (first != null) opens.push(first);
       });
-      if (ymin === ymax) { ymin -= 1; ymax += 1; }
-      const padY = Math.max(1, (ymax - ymin) * 0.1);
-      ymin -= padY; ymax += padY;
+      let center = 0;
+      if (opens.length) {
+        center = opens.reduce((a, b) => a + b, 0) / opens.length;
+        // 开盘附近接近 0 时锁定 0，便于对照零轴
+        if (Math.abs(center) < 0.35) center = 0;
+      }
+      let maxDev = 0;
+      vals.forEach((v) => { maxDev = Math.max(maxDev, Math.abs(v - center)); });
+      if (!(maxDev > 0)) maxDev = 1;
+      const padY = Math.max(0.8, maxDev * 0.12);
+      let ymin = center - maxDev - padY;
+      let ymax = center + maxDev + padY;
+      // 数值保护
+      if (!(ymax > ymin)) { ymin = center - 1; ymax = center + 1; }
 
       const xOf = (t) => pad.l + timeToSessionX(t) * W;
       const yOf = (v) => pad.t + (1 - (v - ymin) / (ymax - ymin)) * H;
@@ -2105,14 +2116,20 @@ function renderDarkQuery(item, profile) {
       ctx.rect(pad.l, pad.t, W, H);
       ctx.stroke();
 
-      if (ymin < 0 && ymax > 0) {
-        ctx.strokeStyle = "#bbb";
+      // 中线：开盘基准（通常为 0）
+      if (ymin < center && ymax > center) {
+        ctx.strokeStyle = "#999";
         ctx.setLineDash([5, 4]);
         ctx.beginPath();
-        ctx.moveTo(pad.l, yOf(0));
-        ctx.lineTo(pad.l + W, yOf(0));
+        ctx.moveTo(pad.l, yOf(center));
+        ctx.lineTo(pad.l + W, yOf(center));
         ctx.stroke();
         ctx.setLineDash([]);
+        // 中线标注
+        ctx.fillStyle = "#999";
+        ctx.font = "10px sans-serif";
+        ctx.textAlign = "left";
+        ctx.fillText(center === 0 ? "0" : ("开 " + center.toFixed(1)), pad.l + 4, yOf(center) - 4);
       }
 
       ["09:30", "10:30", "11:30", "13:00", "14:00", "15:00"].forEach((t) => {
@@ -2314,7 +2331,7 @@ function renderDarkQuery(item, profile) {
         const n = data.count || 0;
         const tag = data.stale ? "轨迹过期缓存 · " : (data.cached ? "轨迹缓存 · " : "轨迹已更新 · ");
         $("trendStatus").textContent = tag + n + "板";
-        $("trendHint").textContent = "主力净流入累计 · 亿元 · 东财分时" + em + "条 · " + (data.asof || "");
+        $("trendHint").textContent = "主力净流入累计 · 亿元 · 分时" + em + "条 · " + (data.asof || "");
         renderTrendLegend(data.series || []);
         paintTrendChart();
       } catch (e) {
@@ -3085,14 +3102,6 @@ function renderMarket(data) {
       state.openCode = null;
       state.membersCache = {};
       setActiveSeg("typeSeg", "data-type", state.type);
-      refresh(true);
-    });
-    $("periodSeg").addEventListener("click", (e) => {
-      const btn = e.target.closest("button[data-period]");
-      if (!btn) return;
-      state.period = btn.getAttribute("data-period");
-      state.openCode = null;
-      setActiveSeg("periodSeg", "data-period", state.period);
       refresh(true);
     });
     $("refreshBtn").addEventListener("click", () => refresh(true));

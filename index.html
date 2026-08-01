@@ -319,7 +319,7 @@
       padding: 2px 6px;
       padding: 3px 8px; font-size: 11px; border-radius: 999px; line-height: 1.3;
     }
-    .daban-list { font-size: 11px; color: #555; line-height: 1.55; max-height: 220px; overflow: auto; }
+    .daban-list { font-size: 11px; color: #555; line-height: 1.55; max-height: 480px; overflow: auto; }
     .daban-row {
       display: flex; justify-content: space-between; gap: 6px; padding: 3px 0;
       border-bottom: 1px solid #f7f1dc;
@@ -714,11 +714,6 @@
         <span>📡 盘面速览</span>
         <span class="hint">板块主值=榜周期主力；宽基ETF=场内主力净流入</span>
       </div>
-      <div class="stats" id="stats">
-        <div class="stat-box"><span class="k">最强吸金</span><span class="v" id="stTop" style="font-size:14px">-</span><span class="s" id="stTopFlow">-</span></div>
-        <div class="stat-box"><span class="k">最多流出</span><span class="v" id="stBot" style="font-size:14px">-</span><span class="s" id="stBotFlow">-</span></div>
-      </div>
-
       <div class="etf-flow-row" id="etfFlowRow">
         <div class="etf-head">
           <span>🧱 宽基ETF资金</span>
@@ -748,12 +743,12 @@
           <div class="vol-pace-wrap">
             <div class="vol-pace-head">
               <span>量能比值</span>
-              <span class="subk" id="volPaceMeta">今预测/昨实际 · 100%=持平</span>
+              <span class="subk" id="volPaceMeta">较昨增量% · 0=持平</span>
             </div>
-            <div class="vol-pace-legend" id="volPaceLegend" title="纵轴=今日预测量能/昨日实际量能×100%；100%=与昨日持平">
-              <span class="acc"><i></i>&gt;100% 放量</span>
-              <span class="dec"><i></i>&lt;100% 缩量</span>
-              <span style="color:#aaa">基准 100%</span>
+            <div class="vol-pace-legend" id="volPaceLegend" title="纵轴=csbl=(今日预测量能/昨日实际-1)×100%；0=与昨日持平">
+              <span class="acc"><i></i>&gt;0 放量</span>
+              <span class="dec"><i></i>&lt;0 缩量</span>
+              <span style="color:#aaa">基准 0</span>
             </div>
             <div class="vol-pace-chart">
               <canvas id="volPaceCanvas" height="120"></canvas>
@@ -1340,15 +1335,6 @@
       const all = inflow.concat(outflow);
       state.maxAbs = Math.max(0.01, ...all.map((x) => Math.abs(x.main_net_yi || 0)));
 
-      const top = inflow[0];
-      $("stTop").textContent = top?.name || "-";
-      $("stTopFlow").textContent = top ? `${fmtYi(top.main_net_yi)}亿 · ${fmtPct(top.change_pct)}` : "-";
-      $("stTop").className = "v up";
-      const bot = outflow[0];
-      $("stBot").textContent = bot?.name || "-";
-      $("stBotFlow").textContent = bot ? `${fmtYi(bot.main_net_yi)}亿 · ${fmtPct(bot.change_pct)}` : "-";
-      $("stBot").className = "v down";
-
       $("inHint").textContent = `${periodLabel(state.period)} · 单位亿`;
       $("outHint").textContent = `${periodLabel(state.period)} · 单位亿`;
       $("asofText").textContent = state.historyDay
@@ -1405,10 +1391,6 @@
           $("statusText").textContent = "历史 · 板块榜不可用 · " + state.historyDay;
           $("inList").innerHTML = `<div class="empty">该日无板块资金快照</div>`;
           $("outList").innerHTML = `<div class="empty">该日无板块资金快照</div>`;
-          $("stTop").textContent = "-";
-          $("stBot").textContent = "-";
-          $("stTopFlow").textContent = "-";
-          $("stBotFlow").textContent = "-";
           setTimeout(() => refreshMarket(false), 80);
         } else if (state._last) {
           softStatus("statusText", `暂时失败，保留上次数据 · ${msg}`, `失败：${msg}`, true);
@@ -1728,9 +1710,23 @@ function renderDarkQuery(item, profile) {
     }
 
     function colorForSeries(item, idx) {
-      const v = Number(item.main_net_yi || 0);
+      if (item && item._color) return item._color;
+      const v = Number((item && item.main_net_yi) || 0);
       const pal = v >= 0 ? TREND_PALETTE_UP : TREND_PALETTE_DOWN;
-      return pal[idx % pal.length];
+      const key = String((item && (item.code || item.name)) || "");
+      if (key) {
+        let h = 0;
+        for (let i = 0; i < key.length; i++) h = (h * 31 + key.charCodeAt(i)) >>> 0;
+        return pal[h % pal.length];
+      }
+      return pal[(Number(idx) || 0) % pal.length];
+    }
+
+    function seriesColor(s, idx) {
+      if (s && s._color) return s._color;
+      const c = colorForSeries(s, idx);
+      if (s) s._color = c;
+      return c;
     }
 
 
@@ -1868,7 +1864,7 @@ function renderDarkQuery(item, profile) {
       const drawOrder = series.slice().reverse();
       drawOrder.forEach((s) => {
         const rank = series.indexOf(s);
-        const color = s._color || colorForSeries(s, rank);
+        const color = seriesColor(s, rank);
         const pts = s.points || [];
         if (pts.length < 1) return;
         ctx.strokeStyle = color;
@@ -1901,7 +1897,7 @@ function renderDarkQuery(item, profile) {
         return {
           s,
           idx,
-          color: s._color || colorForSeries(s, idx),
+          color: seriesColor(s, idx),
           text: s.name + " " + fmtYi(last.main_net_yi),
           y: ly,
           x: Math.min(xOf(last.t) + 8, cssW - pad.r + 4),
@@ -1983,7 +1979,7 @@ function renderDarkQuery(item, profile) {
       }
       series = sortSeriesBalanced(series);
       el.innerHTML = series.map((s, idx) => {
-        const color = s._color || colorForSeries(s, idx);
+        const color = seriesColor(s, idx);
         const off = state.trendHidden[s.code] ? "off" : "";
         return '<span class="lg-item ' + off + '" data-code="' + s.code + '" title="点击显隐">' +
           '<i class="lg-dot" style="background:' + color + '"></i>' +
@@ -2029,7 +2025,7 @@ function renderDarkQuery(item, profile) {
         });
         const data = await fetchJson(API_BASE + "/api/sector/intraday?" + q.toString(), FETCH_DEFAULTS.trend);
         if (!data.ok) throw new Error(data.error || "轨迹接口失败");
-        (data.series || []).forEach((s, i) => { s._color = colorForSeries(s, i); });
+        (data.series || []).forEach((s, i) => { s._color = null; s._color = colorForSeries(s, i); });
         state._trendLast = data;
         markOk("trend");
         const em = data.em_series || 0;
@@ -2087,7 +2083,7 @@ function renderDarkQuery(item, profile) {
             }
           }
           if (!pt) return;
-          rows.push({ name: s.name, v: pt.main_net_yi, color: s._color || colorForSeries(s, idx) });
+          rows.push({ name: s.name, v: pt.main_net_yi, color: seriesColor(s, idx) });
         });
         rows.sort((a, b) => Math.abs(b.v || 0) - Math.abs(a.v || 0));
         state._trendHover = { t: best, rows: rows.slice(0, 10) };
@@ -2155,35 +2151,6 @@ function renderDarkQuery(item, profile) {
             chgHtml: fmtChg(it.change_pct),
           }));
         });
-        const totalYi = etf.total_main_net_yi != null
-          ? etf.total_main_net_yi
-          : ((struct.hs || {}).main_net_yi != null ? struct.hs.main_net_yi : (struct.hs || {}).force_net_yi);
-        parts.push(boxHtml({
-          k: "篮子合计",
-          num: totalYi,
-          digits: 2,
-          sub: "宽基ETF主力净流入",
-          meta: true,
-        }));
-        if (nb && nb.ok && nb.total_net_yi != null) {
-          const nbSub = (nb.asof_time ? ("截至 " + nb.asof_time) : "通道")
-            + (nb.date ? (" · " + String(nb.date).slice(0, 10)) : "");
-          parts.push(boxHtml({
-            k: "北向净买",
-            num: nb.total_net_yi,
-            digits: 2,
-            sub: nbSub,
-            meta: true,
-          }));
-        } else {
-          parts.push(boxHtml({
-            k: "北向净买",
-            num: null,
-            digits: 2,
-            sub: "暂无有效点",
-            meta: true,
-          }));
-        }
         grid.innerHTML = parts.join("");
         const nOk = items.filter((x) => x && x.main_net_yi != null).length;
         if ($("structMeta")) {
@@ -2204,14 +2171,13 @@ function renderDarkQuery(item, profile) {
           boxHtml({ k: "主力净流入", num: hs.force_net_yi, digits: 1, sub: "超大+大单" }),
           boxHtml({ k: "散户净流入", num: hs.retail_net_yi, digits: 1, sub: "小单代理" }),
           boxHtml({ k: "剪刀差", num: hs.scissors_yi, digits: 1, sub: "主力-散户" }),
-          boxHtml({ k: "北向净买", num: (nb && nb.ok) ? nb.total_net_yi : null, digits: 2, sub: "通道资金", meta: true }),
         ];
         grid.innerHTML = parts.join("");
       }
       if ($("structMeta")) $("structMeta").textContent = "亿元";
       if ($("structNote")) {
         $("structNote").textContent = struct.disclaimer
-          || "主力=超大+大单，散户=小单，均为规模代理；北向为通道资金。";
+          || "主力=超大+大单，散户=小单，均为规模代理。";
       }
     }
 
@@ -2310,20 +2276,21 @@ function renderMarket(data) {
           if (!Number.isFinite(r) && p.implied_yi != null && p.prev_yi != null && Number(p.prev_yi) > 0) {
             r = Number(p.implied_yi) / Number(p.prev_yi);
           }
-          // fallback from delta + prev if needed
           if (!Number.isFinite(r) && p.delta_yi != null && p.prev_yi != null && Number(p.prev_yi) > 0) {
             r = (Number(p.prev_yi) + Number(p.delta_yi)) / Number(p.prev_yi);
           }
-          if (!Number.isFinite(r) || r <= 0) return null;
-          // 纵轴用百分比：100 = 与昨持平
-          return Object.assign({}, p, { _ratio: r * 100 });
+          // csbl = (predict/昨全日 - 1) × 100；与 pace-1 同口径
+          let csbl = p.csbl != null ? Number(p.csbl) : NaN;
+          if (!Number.isFinite(csbl) && Number.isFinite(r)) csbl = (r - 1) * 100;
+          if (!Number.isFinite(csbl)) return null;
+          return Object.assign({}, p, { _csbl: csbl, _pace: Number.isFinite(r) ? r : (1 + csbl / 100) });
         }).filter(Boolean);
         const latest = pace.latest || (pts.length ? pts[pts.length - 1] : null);
 
         if (meta) {
           meta.textContent = pts.length
-            ? ("今预测/昨实际% · " + pts.length + "点")
-            : "今预测/昨实际 · 100%=持平";
+            ? ("较昨增量% · " + pts.length + "点 · 0=持平")
+            : "较昨增量% · 0=持平";
         }
 
         if (!pts.length) {
@@ -2360,23 +2327,21 @@ function renderMarket(data) {
         const W = Math.max(10, cssW - pad.l - pad.r);
         const H = Math.max(10, cssH - pad.t - pad.b);
 
-        let ymin = 100, ymax = 100;
+        let ymin = 0, ymax = 0;
         pts.forEach(function (p) {
-          const v = Number(p._ratio);
+          const v = Number(p._csbl);
           ymin = Math.min(ymin, v);
           ymax = Math.max(ymax, v);
         });
-        // always include baseline 100%, leave breathing room
-        ymin = Math.min(ymin, 95);
-        ymax = Math.max(ymax, 105);
+        // always include baseline 0, leave breathing room
+        ymin = Math.min(ymin, -5);
+        ymax = Math.max(ymax, 5);
         let padY = Math.max(2, (ymax - ymin) * 0.18);
-        ymin = Math.max(50, ymin - padY);
-        ymax = Math.min(250, ymax + padY);
-        pts.forEach(function (p) {
-          const v = Number(p._ratio);
-          if (v < ymin) ymin = Math.max(30, v - 2);
-          if (v > ymax) ymax = Math.min(300, v + 2);
-        });
+        ymin = ymin - padY;
+        ymax = ymax + padY;
+        // soft clamp extreme axes
+        if (ymin < -80) ymin = Math.min(-5, Number(pts.reduce((m,p)=>Math.min(m,p._csbl),0)) - 3);
+        if (ymax > 150) ymax = Math.max(5, Number(pts.reduce((m,p)=>Math.max(m,p._csbl),0)) + 3);
 
         const xOf = function (i) {
           return pad.l + (pts.length === 1 ? W / 2 : (i / (pts.length - 1)) * W);
@@ -2386,23 +2351,24 @@ function renderMarket(data) {
           const y = pad.t + (1 - (vv - ymin) / (ymax - ymin)) * H;
           return Math.max(pad.t + 1, Math.min(pad.t + H - 1, y));
         };
-        const fmtRatio = function (v) {
+        const fmtCsbl = function (v) {
           const n = Number(v);
           if (!Number.isFinite(n)) return "—";
-          const body = Math.abs(n) >= 100 ? Math.round(n).toString() : n.toFixed(1);
-          return body + "%";
+          const sign = n > 0 ? "+" : "";
+          const body = Math.abs(n) >= 10 ? Math.round(n).toString() : n.toFixed(1);
+          return sign + body + "%";
         };
 
-        // samples with 100% crossings for dual-tone split
+        // samples with 0 crossings for dual-tone split
         const samples = [];
         for (let i = 0; i < pts.length; i++) {
-          samples.push({ v: Number(pts[i]._ratio), x: xOf(i), y: yOf(Number(pts[i]._ratio)) });
+          samples.push({ v: Number(pts[i]._csbl), x: xOf(i), y: yOf(Number(pts[i]._csbl)) });
           if (i < pts.length - 1) {
-            const v0 = Number(pts[i]._ratio), v1 = Number(pts[i + 1]._ratio);
-            if ((v0 > 100 && v1 < 100) || (v0 < 100 && v1 > 100)) {
-              const r = Math.abs(v0 - 100) / (Math.abs(v0 - 100) + Math.abs(v1 - 100));
+            const v0 = Number(pts[i]._csbl), v1 = Number(pts[i + 1]._csbl);
+            if ((v0 > 0 && v1 < 0) || (v0 < 0 && v1 > 0)) {
+              const r = Math.abs(v0) / (Math.abs(v0) + Math.abs(v1));
               const xz = xOf(i) + (xOf(i + 1) - xOf(i)) * r;
-              samples.push({ v: 100, x: xz, y: yOf(100), z: true });
+              samples.push({ v: 0, x: xz, y: yOf(0), z: true });
             }
           }
         }
@@ -2410,30 +2376,30 @@ function renderMarket(data) {
         ctx.fillStyle = "#fcfdff";
         ctx.fillRect(0, 0, cssW, cssH);
 
-        // baseline 100% = 与昨持平
-        const y1 = yOf(100);
+        // baseline 0 = 与昨持平
+        const y0 = yOf(0);
         ctx.strokeStyle = "#c5ccd6";
         ctx.lineWidth = 1;
         ctx.setLineDash([4, 3]);
         ctx.beginPath();
-        ctx.moveTo(pad.l, y1);
-        ctx.lineTo(pad.l + W, y1);
+        ctx.moveTo(pad.l, y0);
+        ctx.lineTo(pad.l + W, y0);
         ctx.stroke();
         ctx.setLineDash([]);
         ctx.fillStyle = "#9aa3af";
         ctx.font = "10px sans-serif";
         ctx.textAlign = "left";
-        ctx.fillText("100%", 2, y1 + 3);
+        ctx.fillText("0", 2, y0 + 3);
 
         function fillBand(above) {
           ctx.beginPath();
           let started = false;
           for (let k = 0; k < samples.length; k++) {
             const s = samples[k];
-            const on = above ? s.v >= 100 : s.v <= 100;
+            const on = above ? s.v >= 0 : s.v <= 0;
             if (!on) {
               if (started) {
-                ctx.lineTo(s.x, y1);
+                ctx.lineTo(s.x, y0);
                 ctx.closePath();
                 ctx.fill();
                 started = false;
@@ -2442,7 +2408,7 @@ function renderMarket(data) {
               continue;
             }
             if (!started) {
-              ctx.moveTo(s.x, y1);
+              ctx.moveTo(s.x, y0);
               ctx.lineTo(s.x, s.y);
               started = true;
             } else {
@@ -2451,7 +2417,7 @@ function renderMarket(data) {
           }
           if (started) {
             const lastS = samples[samples.length - 1];
-            ctx.lineTo(lastS.x, y1);
+            ctx.lineTo(lastS.x, y0);
             ctx.closePath();
             ctx.fill();
           }
@@ -2470,7 +2436,7 @@ function renderMarket(data) {
           let pen = false;
           for (let k = 0; k < samples.length; k++) {
             const s = samples[k];
-            const on = above ? s.v >= 100 : s.v <= 100;
+            const on = above ? s.v >= 0 : s.v <= 0;
             if (!on) { pen = false; continue; }
             if (!pen) { ctx.moveTo(s.x, s.y); pen = true; }
             else ctx.lineTo(s.x, s.y);
@@ -2480,8 +2446,8 @@ function renderMarket(data) {
         strokeBand(true, "#c0392b");
         strokeBand(false, "#1e8449");
 
-        const last = Number(pts[pts.length - 1]._ratio);
-        const col = last > 100.5 ? "#c0392b" : (last < 99.5 ? "#1e8449" : "#5d6d7e");
+        const last = Number(pts[pts.length - 1]._csbl);
+        const col = last > 0.5 ? "#c0392b" : (last < -0.5 ? "#1e8449" : "#5d6d7e");
         const ex = xOf(pts.length - 1), ey = yOf(last);
         ctx.fillStyle = col;
         ctx.beginPath();
@@ -2507,32 +2473,38 @@ function renderMarket(data) {
 
         // y labels
         ctx.textAlign = "right";
-        ctx.fillText(fmtRatio(ymax), pad.l - 4, pad.t + 9);
-        ctx.fillText(fmtRatio(ymin), pad.l - 4, pad.t + H - 1);
+        ctx.fillText(fmtCsbl(ymax), pad.l - 4, pad.t + 9);
+        ctx.fillText(fmtCsbl(ymin), pad.l - 4, pad.t + H - 1);
         ctx.textAlign = "left";
 
         if (foot && latest) {
-          let pctN = latest.pace != null ? Number(latest.pace) * 100 : NaN;
-          if (!Number.isFinite(pctN) && pts.length) pctN = Number(pts[pts.length - 1]._ratio);
-          const rN = Number.isFinite(pctN) ? pctN / 100 : NaN;
+          let csblN = latest.csbl != null ? Number(latest.csbl) : NaN;
+          if (!Number.isFinite(csblN) && latest.pace != null) csblN = (Number(latest.pace) - 1) * 100;
+          if (!Number.isFinite(csblN) && pts.length) csblN = Number(pts[pts.length - 1]._csbl);
+          const rN = Number.isFinite(csblN) ? (1 + csblN / 100) : NaN;
+          const predYi = latest.implied_yi != null ? Number(latest.implied_yi) : (
+            Number.isFinite(rN) && latest.prev_yi != null ? rN * Number(latest.prev_yi) : NaN
+          );
           const dYi = latest.delta_yi != null ? Number(latest.delta_yi) : (
-            Number.isFinite(rN) && latest.prev_yi != null
-              ? (rN - 1) * Number(latest.prev_yi)
+            Number.isFinite(predYi) && latest.prev_yi != null
+              ? predYi - Number(latest.prev_yi)
               : NaN
           );
           const levelLabel = latest.level_label
-            || (Number.isFinite(pctN) ? (pctN > 100.5 ? "放量" : (pctN < 99.5 ? "缩量" : "持平")) : "—");
-          const rCls = Number.isFinite(pctN) ? (pctN > 100.5 ? "up" : (pctN < 99.5 ? "down" : "")) : "";
+            || (Number.isFinite(csblN) ? (csblN > 0.5 ? "放量" : (csblN < -0.5 ? "缩量" : "持平")) : "—");
+          const rCls = Number.isFinite(csblN) ? (csblN > 0.5 ? "up" : (csblN < -0.5 ? "down" : "")) : "";
           const dCls = Number.isFinite(dYi) ? (dYi > 1 ? "up" : (dYi < -1 ? "down" : "")) : "";
-          const rTxt = Number.isFinite(pctN)
-            ? (pctN.toFixed(1) + "%（较昨" + ((pctN - 100) >= 0 ? "+" : "") + (pctN - 100).toFixed(1) + "%）")
+          const predTxt = Number.isFinite(predYi) ? (Math.round(predYi) + "亿") : "—";
+          const csblTxt = Number.isFinite(csblN)
+            ? ((csblN >= 0 ? "+" : "") + csblN.toFixed(1) + "%")
             : "—";
           const dTxt = Number.isFinite(dYi)
             ? ((dYi > 0 ? "+" : "") + dYi.toFixed(0) + "亿")
             : "—";
+          // 展示：预测xxxx亿 (+csbl%, 增量xxx亿)
           foot.innerHTML =
-            '<span class="' + rCls + '">比值 ' + rTxt + "</span>"
-            + ' · <span class="' + dCls + '">' + levelLabel + " " + dTxt + "</span>";
+            '<span class="' + rCls + '">预测' + predTxt + " (" + csblTxt + ", 增量" + dTxt + ")</span>"
+            + ' · <span class="' + dCls + '">' + levelLabel + "</span>";
         }
       })();
 
@@ -2554,11 +2526,9 @@ function renderMarket(data) {
       const sealDen = (Number(up) || 0) + (Number(broken) || 0);
       const seal = sealDen > 0 ? ((Number(up) || 0) / sealDen * 100).toFixed(0) + "%" : "-";
       if ($("limSeal")) $("limSeal").textContent = seal;
-      const prevDayHint = sum.prev_day || upObj.prev_day || "";
-      const prevShort = prevDayHint ? String(prevDayHint).slice(5, 10) : "昨";
-      if ($("limUpSub")) $("limUpSub").textContent = "今日/" + prevShort;
-      if ($("limDownSub")) $("limDownSub").textContent = "今日/" + prevShort;
-      if ($("limBrokenSub")) $("limBrokenSub").textContent = "今日/" + prevShort;
+      if ($("limUpSub")) $("limUpSub").textContent = "今日/昨日";
+      if ($("limDownSub")) $("limDownSub").textContent = "今日/昨日";
+      if ($("limBrokenSub")) $("limBrokenSub").textContent = "今日/昨日";
       if ($("limSealSub")) $("limSealSub").textContent = "涨停/(涨停+炸板)";
 
       // 综合强度（自研）— 作为五按钮之一
@@ -2622,7 +2592,7 @@ function renderMarket(data) {
         box.innerHTML = '<div style="color:#999;padding:4px 0">' + (tab.error || db.error || "暂无打板数据（休市或东财池为空）") + "</div>";
         return;
       }
-      box.innerHTML = items.slice(0, 15).map(function (x) {
+      box.innerHTML = items.map(function (x) {
         const chg = x.change_pct != null
           ? '<span class="' + toneClass(x.change_pct) + '">' + fmtPct(x.change_pct) + "</span>"
           : "";

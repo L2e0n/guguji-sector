@@ -2090,20 +2090,33 @@ function renderDarkQuery(item, profile) {
         });
         if (first != null) opens.push(first);
       });
+      // 中线：开盘首点均值（仅作参考虚线，不再用来对称拉轴）
       let center = 0;
       if (opens.length) {
         center = opens.reduce((a, b) => a + b, 0) / opens.length;
-        // 开盘附近接近 0 时锁定 0，便于对照零轴
         if (Math.abs(center) < 0.35) center = 0;
       }
-      let maxDev = 0;
-      vals.forEach((v) => { maxDev = Math.max(maxDev, Math.abs(v - center)); });
-      if (!(maxDev > 0)) maxDev = 1;
-      const padY = Math.max(0.8, maxDev * 0.12);
-      let ymin = center - maxDev - padY;
-      let ymax = center + maxDev + padY;
-      // 数值保护
-      if (!(ymax > ymin)) { ymin = center - 1; ymax = center + 1; }
+      // 纵轴上下独立自适应：按真实 min/max，不因单边上冲把另一边对称拉满
+      // 例：数据 -20…+320 → 约 [-50, +350]，而不是 ±350
+      let dataMin = vals.length ? Math.min.apply(null, vals) : -1;
+      let dataMax = vals.length ? Math.max.apply(null, vals) : 1;
+      if (!(dataMax > dataMin)) {
+        const mid = Number.isFinite(dataMax) ? dataMax : 0;
+        dataMin = mid - 1;
+        dataMax = mid + 1;
+      }
+      // 若开盘基准在数据旁不远，略扩展以纳入中线，避免虚线贴边看不见
+      if (Number.isFinite(center)) {
+        const span0 = dataMax - dataMin;
+        const slack = Math.max(2, span0 * 0.05);
+        if (center < dataMin && dataMin - center <= slack) dataMin = center;
+        if (center > dataMax && center - dataMax <= slack) dataMax = center;
+      }
+      const span = dataMax - dataMin;
+      const padY = Math.max(0.8, span * 0.08);
+      let ymin = dataMin - padY;
+      let ymax = dataMax + padY;
+      if (!(ymax > ymin)) { ymin = (center || 0) - 1; ymax = (center || 0) + 1; }
 
       const xOf = (t) => pad.l + timeToSessionX(t) * W;
       const yOf = (v) => pad.t + (1 - (v - ymin) / (ymax - ymin)) * H;

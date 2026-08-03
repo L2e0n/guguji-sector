@@ -3251,7 +3251,7 @@ function renderMarket(data) {
           if (state.historyDay) return; // 历史日不自动刷
           if (state._inflight.dual || state._inflight.trend || state._inflight.market) return;
           refresh(false);
-        }, 30000);
+        }, 5000); // 5s UI 轮询；自动刷 refresh=0，受服务端约 15s 缓存约束
       }
     }
 

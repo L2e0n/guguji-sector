@@ -1202,6 +1202,7 @@
       timer: null,
       maxAbs: 1,
       openCode: null,
+      openSide: null, // in | out — 决定成分股按净流入/净流出排序
       membersCache: {},
       page: "sector",
       historyDay: null,
@@ -1749,7 +1750,7 @@
               <div class="kv"><span>5日主力</span><b class="${toneClass(item.day5_main_net_yi)}">${fmtYi(item.day5_main_net_yi)}亿</b></div>
               <div class="kv"><span>10日主力</span><b class="${toneClass(item.day10_main_net_yi)}">${fmtYi(item.day10_main_net_yi)}亿</b></div>
             </div>
-            <div class="structure-note" style="margin:8px 0 0">结构为今日分档代理；右侧主值为当前榜周期主力净流入。</div>
+            <div class="structure-note" style="margin:8px 0 0">结构为今日分档代理；右侧主值为当前榜周期${side === "out" ? "主力净流出" : "主力净流入"}（成分股同口径排序）。</div>
             <div class="members" id="m-${item.code}"><div class="empty">展开加载成分股…</div></div>
           </div>
         </div>`;
@@ -1762,20 +1763,33 @@
       }
       el.innerHTML = items.map((it, i) => rowHtml(it, i + 1, side)).join("");
       el.querySelectorAll(".row").forEach((node) => {
-        node.addEventListener("click", () => onToggle(node.getAttribute("data-code")));
+        node.addEventListener("click", () => onToggle(
+          node.getAttribute("data-code"),
+          node.getAttribute("data-side")
+        ));
       });
     }
 
-    async function loadMembers(code) {
+    async function loadMembers(code, side) {
       const box = document.getElementById("m-" + code);
       if (!box) return;
-      if (state.membersCache[code]) {
-        box.innerHTML = state.membersCache[code];
+      const sort = (side || state.openSide || "in") === "out" ? "out" : "in";
+      const period = state.period || "1";
+      const cacheKey = `${code}|${sort}|${period}`;
+      if (state.membersCache[cacheKey]) {
+        box.innerHTML = state.membersCache[cacheKey];
         return;
       }
       box.innerHTML = '<div class="empty">成分股加载中…</div>';
       try {
-        const url = `${API_BASE}/api/sector/${encodeURIComponent(code)}/members?limit=12&sort=in`;
+        // 净流入榜下钻：按主力净流入排序；净流出榜下钻：按主力净流出排序（更负优先）
+        // 主值字段与榜周期一致：今日 f62；后端 sort=in|out 已支持
+        const q = new URLSearchParams({
+          limit: "12",
+          sort,
+          period,
+        });
+        const url = `${API_BASE}/api/sector/${encodeURIComponent(code)}/members?${q}`;
         const data = await fetchJson(url, FETCH_DEFAULTS.members);
         if (!data.ok) throw new Error(data.error || "load failed");
         const html = (data.items || []).map((m) => `
@@ -1786,19 +1800,25 @@
               · <b class="${toneClass(m.main_net_yi)}">${fmtYi(m.main_net_yi)}亿</b>
             </span>
           </div>`).join("") || '<div class="empty">无成分股数据</div>';
-        state.membersCache[code] = html;
+        state.membersCache[cacheKey] = html;
         box.innerHTML = html;
       } catch (e) {
         box.innerHTML = `<div class="empty">成分股加载失败：${e.message || e}</div>`;
       }
     }
 
-    function onToggle(code) {
-      state.openCode = state.openCode === code ? null : code;
+    function onToggle(code, side) {
+      if (state.openCode === code) {
+        state.openCode = null;
+        state.openSide = null;
+      } else {
+        state.openCode = code;
+        state.openSide = (side === "out") ? "out" : "in";
+      }
       // re-render with current data snapshot
       if (state._last) {
         applyData(state._last);
-        if (state.openCode) loadMembers(state.openCode);
+        if (state.openCode) loadMembers(state.openCode, state.openSide);
       }
     }
 
@@ -1824,7 +1844,7 @@
       } else if ($("trendStatus")) {
         $("trendStatus").textContent = "历史日不提供分时轨迹";
       }
-      if (state.openCode && !state.historyDay) loadMembers(state.openCode);
+      if (state.openCode && !state.historyDay) loadMembers(state.openCode, state.openSide);
     }
 
     async function refresh(manual = false) {
@@ -3414,6 +3434,7 @@ function renderMarket(data) {
       if (!btn) return;
       state.type = btn.getAttribute("data-type");
       state.openCode = null;
+      state.openSide = null;
       state.membersCache = {};
       setActiveSeg("typeSeg", "data-type", state.type);
       refresh(true);

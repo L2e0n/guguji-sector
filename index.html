@@ -370,6 +370,9 @@
     .metric .k { color: var(--muted); font-size: 11px; }
     .metric .v { font-weight: 800; margin-top: 2px; font-variant-numeric: tabular-nums; }
 
+    .dark-rank-title { gap: 8px; flex-wrap: wrap; }
+    .dark-rank-tools { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+    .dark-rank-tools .seg .btn { padding: 4px 10px; font-size: 12px; }
     /* 暗盘榜：三列密排，展开时占满整行；不影响板块双列 .list */
     #darkList.dark-list-grid {
       display: grid;
@@ -1041,9 +1044,15 @@
       </div>
 
       <div class="card">
-        <div class="section-title">
+        <div class="section-title dark-rank-title">
           <span>📊 暗盘 / 明盘资金榜</span>
-          <span class="hint" id="darkRankHint">单位：亿</span>
+          <div class="dark-rank-tools">
+            <div class="seg" id="darkOrderSeg" title="对当前榜单本地排序">
+              <button type="button" class="btn active" data-order="amount">按资金额</button>
+              <button type="button" class="btn secondary" data-order="chg">按涨幅</button>
+            </div>
+            <span class="hint" id="darkRankHint">单位：亿</span>
+          </div>
         </div>
         <div class="list dark-list-grid" id="darkList"><div class="empty">切换到本页后加载…</div></div>
       </div>
@@ -1201,6 +1210,8 @@
       darkHistoryDays: [],
       historyStart: "2026-07-31",
       darkSort: "dark_in",
+      darkListOrder: "amount",
+      darkListOrderDir: "desc",
       darkLoaded: false,
       darkOpenCode: null,
       darkMaxAbs: 1,
@@ -2053,17 +2064,95 @@ function renderDarkQuery(item, profile) {
       bindCancel();
     }
 
+    function darkPrimaryAmount(item) {
+      if (!item) return null;
+      const light = (state.darkSort || "dark_in").startsWith("light");
+      const v = light ? item.light_net_yi : item.dark_net_yi;
+      return v == null || Number.isNaN(Number(v)) ? null : Number(v);
+    }
+
+    function sortDarkItems(items) {
+      const arr = (items || []).slice();
+      const order = state.darkListOrder || "amount";
+      const dir = state.darkListOrderDir === "asc" ? "asc" : "desc";
+      const outflow = String(state.darkSort || "dark_in").endsWith("_out");
+      const num = (v) => (v == null || Number.isNaN(Number(v)) ? null : Number(v));
+      arr.sort((a, b) => {
+        let av;
+        let bv;
+        if (order === "chg") {
+          av = num(a && a.change_pct);
+          bv = num(b && b.change_pct);
+        } else {
+          // amount: 流出榜默认更负优先（升序），流入榜默认更大优先（降序）
+          av = darkPrimaryAmount(a);
+          bv = darkPrimaryAmount(b);
+        }
+        if (av == null && bv == null) return 0;
+        if (av == null) return 1;
+        if (bv == null) return -1;
+        let cmp = av - bv;
+        if (order === "amount" && outflow && dir === "desc") {
+          // 流出 + 默认方向：金额升序（-10 在 -1 前）
+          cmp = av - bv;
+        } else if (order === "amount" && outflow && dir === "asc") {
+          cmp = bv - av;
+        } else if (dir === "asc") {
+          cmp = av - bv;
+        } else {
+          cmp = bv - av;
+        }
+        if (cmp !== 0) return cmp;
+        // 稳定次序：代码
+        return String((a && a.code) || "").localeCompare(String((b && b.code) || ""));
+      });
+      return arr;
+    }
+
+    function darkOrderLabel() {
+      const order = state.darkListOrder || "amount";
+      const dir = state.darkListOrderDir === "asc" ? "asc" : "desc";
+      if (order === "chg") {
+        return dir === "asc" ? "涨幅升序" : "涨幅降序";
+      }
+      const outflow = String(state.darkSort || "dark_in").endsWith("_out");
+      if (outflow) {
+        // desc=更负优先，asc=更接近0/转正优先
+        return dir === "asc" ? "资金额升序" : "资金额降序";
+      }
+      return dir === "asc" ? "资金额升序" : "资金额降序";
+    }
+
+    function syncDarkOrderSeg() {
+      const root = $("darkOrderSeg");
+      if (!root) return;
+      const order = state.darkListOrder || "amount";
+      const dir = state.darkListOrderDir === "asc" ? "asc" : "desc";
+      root.querySelectorAll("button[data-order]").forEach((btn) => {
+        const on = btn.getAttribute("data-order") === order;
+        btn.classList.toggle("active", on);
+        btn.classList.toggle("secondary", !on);
+        const base = btn.getAttribute("data-order") === "chg" ? "按涨幅" : "按资金额";
+        if (on) {
+          btn.textContent = base + (dir === "asc" ? "↑" : "↓");
+        } else {
+          btn.textContent = base;
+        }
+      });
+    }
+
     function renderDarkList(items) {
       const el = $("darkList");
       if (!items || !items.length) {
         el.innerHTML = '<div class="empty">暂无数据</div>';
         return;
       }
-      state.darkMaxAbs = Math.max(0.01, ...items.map((x) => {
-        const v = (state.darkSort || "dark_in").startsWith("light") ? x.light_net_yi : x.dark_net_yi;
+      const sorted = sortDarkItems(items);
+      state.darkMaxAbs = Math.max(0.01, ...sorted.map((x) => {
+        const v = darkPrimaryAmount(x);
         return Math.abs(v || 0);
       }));
-      el.innerHTML = items.map((it, i) => darkRowHtml(it, i + 1)).join("");
+      el.innerHTML = sorted.map((it, i) => darkRowHtml(it, i + 1)).join("");
       el.querySelectorAll(".row").forEach((node) => {
         node.addEventListener("click", () => {
           const code = node.getAttribute("data-code");
@@ -2071,6 +2160,7 @@ function renderDarkQuery(item, profile) {
           renderDarkList(state._darkLast?.items || items);
         });
       });
+      syncDarkOrderSeg();
     }
 
     async function refreshDark(manual = false) {
@@ -2094,7 +2184,7 @@ function renderDarkQuery(item, profile) {
         state.darkLoaded = true;
         markOk("dark");
         const histNote = data.history || state.darkHistoryDay ? " · 历史" : "";
-        $("darkRankHint").textContent = `${darkSortLabel(state.darkSort)} · 共 ${data.count || data.returned || 0} 只 · 单位亿${histNote}`;
+        $("darkRankHint").textContent = `${darkSortLabel(state.darkSort)} · ${darkOrderLabel()} · 共 ${data.count || data.returned || 0} 只 · 单位亿${histNote}`;
         $("darkAsofText").textContent = `数据时点：${data.asof_day || data.history_day || data.asof || "-"}`;
         const tag = state.darkHistoryDay
           ? ("历史快照 · " + state.darkHistoryDay)
@@ -3179,8 +3269,33 @@ function renderMarket(data) {
       if (!btn) return;
       state.darkSort = btn.getAttribute("data-sort");
       state.darkOpenCode = null;
+      // 切换暗/明盘口径时，资金额排序方向回到该口径默认
+      if ((state.darkListOrder || "amount") === "amount") {
+        state.darkListOrderDir = "desc";
+      }
       setActiveSeg("darkSortSeg", "data-sort", state.darkSort);
+      syncDarkOrderSeg();
       refreshDark(true);
+    });
+    $("darkOrderSeg").addEventListener("click", (e) => {
+      const btn = e.target.closest("button[data-order]");
+      if (!btn) return;
+      const next = btn.getAttribute("data-order") || "amount";
+      if (state.darkListOrder === next) {
+        state.darkListOrderDir = state.darkListOrderDir === "asc" ? "desc" : "asc";
+      } else {
+        state.darkListOrder = next;
+        state.darkListOrderDir = "desc";
+      }
+      state.darkOpenCode = null;
+      syncDarkOrderSeg();
+      if (state._darkLast && state._darkLast.items) {
+        const n = (state._darkLast.items || []).length;
+        const histNote2 = state.darkHistoryDay ? " · 历史" : "";
+      $("darkRankHint").textContent = `${darkSortLabel(state.darkSort)} · ${darkOrderLabel()} · 共 ${state._darkLast.count || n} 只 · 单位亿${histNote2}`;
+        renderDarkList(state._darkLast.items);
+        $("darkStatusText").textContent = `已按${darkOrderLabel()}重排`;
+      }
     });
     $("darkRefreshBtn").addEventListener("click", () => refreshDark(true));
     $("darkQueryBtn").addEventListener("click", () => queryDark());

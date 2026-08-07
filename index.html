@@ -104,12 +104,6 @@
       display:flex; justify-content:space-between; gap:8px; align-items:center;
     }
     .market-panel h3 .subk { font-size: 11px; color: var(--muted); font-weight: 500; }
-    .vol-vs-prev {
-      margin-top: 8px; padding: 6px 8px; border-radius: 8px;
-      background: #f7f8fa; font-size: 13px; font-weight: 700;
-      font-variant-numeric: tabular-nums; text-align: center;
-    }
-
     .vol-pace-wrap {
       margin-top: 8px;
       padding-top: 8px;
@@ -155,6 +149,7 @@
       width: 10px; height: 10px; flex: 0 0 10px; background: #3188d0;
     }
     .vol-pace-baseline b { color: #a0a3a8; font-weight: 700; }
+    .vol-pace-baseline .detail { color: #c7353a; font-size: 11px; font-weight: 700; }
     .vol-pace-empty {
       position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
       color: #aaa; font-size: 11px; pointer-events: none;
@@ -172,10 +167,6 @@
     .vol-pace-foot .down { color: #1e8449; font-weight: 700; }
     .overview-card .vol-panel { overflow: visible !important; min-height: auto !important; height: auto !important; align-self: stretch; max-height: none !important; }
     .overview-card .vol-pace-wrap { flex: 0 0 auto; }
-
-    .vol-vs-prev.expand { color: #c0392b; background: #fdecea; }
-    .vol-vs-prev.shrink { color: #1e8449; background: #eafaf1; }
-    .vol-vs-prev.flat { color: #666; }
 
     .mtable { width: 100%; border-collapse: collapse; font-size: 12px; table-layout: fixed; }
     .mtable th, .mtable td { padding: 4px 2px; text-align: right; font-variant-numeric: tabular-nums; }
@@ -644,9 +635,6 @@
     .overview-card .mtable td { padding: 4px 3px; }
     .overview-card .mtable th { font-size: 12px; }
     .overview-card .mtable td.b { font-size: 15px; }
-    .overview-card .vol-vs-prev {
-      margin-top: auto; padding: 6px 8px; font-size: 13px; border-radius: 6px;
-    }
     /* 沪深京量能：表内字号 12px（对齐涨停个股名单 limit-tops） UI-VOLFONT-12 */
     .overview-card .vol-panel {
       padding: 8px 10px;
@@ -711,16 +699,6 @@
     }
     .overview-card .vol-panel .mtable .name {
       font-weight: 600 !important;
-    }
-    .overview-card .vol-panel .vol-vs-prev {
-      margin-top: 6px;
-      margin-bottom: 0;
-      padding: 5px 8px;
-      font-size: 12px !important;
-      font-weight: 700 !important;
-      border-radius: 6px;
-      line-height: 1.35;
-      flex: 0 0 auto;
     }
     .overview-card .vol-panel .vol-pace-wrap {
       margin-top: 8px;
@@ -913,7 +891,6 @@
               <tr><td colspan="3" style="text-align:center;color:#999">加载中…</td></tr>
             </tbody>
           </table>
-          <div id="volVsPrev" class="vol-vs-prev">量能：—</div>
           <div class="vol-pace-wrap">
             <div class="vol-pace-summary" aria-label="量能比值摘要">
               <div class="vol-pace-summary-row actual">
@@ -927,17 +904,17 @@
                 <span class="label">今日</span><span class="divider">|</span>
                 <span class="label">预测量能</span>
                 <b class="value" id="volPaceForecast">—</b><span class="unit">亿</span>
-                <span class="detail" id="volPaceForecastDetail">（—）</span>
               </div>
             </div>
-              <div class="vol-pace-baseline" id="volPaceBaseline">
-                <span class="marker" aria-hidden="true"></span>
-                <span>昨日&nbsp;|&nbsp;总量能&nbsp;<b id="volPacePrev">—</b>亿</span>
-              </div>
-              <div class="vol-pace-chart">
-                <canvas id="volPaceCanvas" height="150"></canvas>
-                <div class="vol-pace-empty" id="volPaceEmpty">等待分时路径…</div>
-              </div>
+            <div class="vol-pace-baseline" id="volPaceBaseline">
+              <span class="marker" aria-hidden="true"></span>
+              <span>昨日&nbsp;|&nbsp;总量能&nbsp;<b id="volPacePrev">—</b>亿</span>
+              <span class="detail" id="volPaceForecastDetail">（—）</span>
+            </div>
+            <div class="vol-pace-chart">
+              <canvas id="volPaceCanvas" height="150"></canvas>
+              <div class="vol-pace-empty" id="volPaceEmpty">等待分时路径…</div>
+            </div>
             <div class="vol-pace-foot" id="volPaceFoot"><span class="up">红色=放量</span> · <span class="down">绿色=缩量</span></div>
           </div>
         </div>
@@ -2999,30 +2976,6 @@ function renderMarket(data) {
           + '<td class="' + strong + '" style="font-size:12px">' + pred + "</td>"
           + "</tr>";
       }).join("");
-
-      // 较昨日放量/缩量
-      const vsEl = $("volVsPrev");
-      if (vsEl) {
-        const vs = vol.vs_prev || {};
-        const lab = vs.label;
-        const dYi = vs.delta_yi;
-        const prevYi = vs.prev_hs_amount_yi;
-        const prevDay = vs.prev_day || "";
-        vsEl.className = "vol-vs-prev";
-        if (lab && dYi != null) {
-          const absYi = Math.abs(Number(dYi));
-          const absTxt = absYi >= 100 ? absYi.toFixed(0) : absYi.toFixed(1);
-          const dir = vs.direction || "";
-          if (dir) vsEl.classList.add(dir);
-          const sign = Number(dYi) > 0 ? "+" : (Number(dYi) < 0 ? "-" : "");
-          // basisHint is about TODAY's ref (predict vs actual), NOT yesterday.
-          // Yesterday amount is always realized full-day turnover.
-          vsEl.textContent = lab + " " + sign + absTxt + "亿"
-            + (prevYi != null ? "（昨实际" + Number(prevYi).toFixed(0) + "亿" + (prevDay ? " " + prevDay.slice(5) : "") + "）" : "");
-        } else {
-          vsEl.textContent = "量能：—";
-        }
-      }
 
       // 量能比值：纵轴 = 今日预测全天量能 / 昨日实际量能 ×100%（pace*100）；100%=与昨持平
       (function renderVolPace() {

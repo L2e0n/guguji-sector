@@ -1253,6 +1253,8 @@
       trendBoardCode: "",
       trendBoardName: "",
       trendBoardOptions: {},
+      trendBoardOptionsPending: {},
+      trendBoardOptionsError: {},
       _marketLast: null,
       dabanTab: "auction",
       _dabanLast: null,
@@ -2642,12 +2644,18 @@ function renderDarkQuery(item, profile) {
     function trendBoardMatches(query) {
       const key = state.type || "industry";
       const options = state.trendBoardOptions[key] || [];
-      const q = String(query || "").trim().toLowerCase();
+      const q = normalizeTrendSearch(query);
       if (!q) return options.slice(0, 20);
       return options.filter((item) =>
-        String(item.name || "").toLowerCase().includes(q)
-        || String(item.code || "").toLowerCase().includes(q)
+        normalizeTrendSearch(item.name).includes(q)
+        || normalizeTrendSearch(item.code).includes(q)
       ).slice(0, 20);
+    }
+
+    function normalizeTrendSearch(value) {
+      const text = String(value == null ? "" : value);
+      const normalized = typeof text.normalize === "function" ? text.normalize("NFKC") : text;
+      return normalized.replace(/\s+/g, "").toLowerCase();
     }
 
     function escapeTrendText(value) {
@@ -2675,46 +2683,63 @@ function renderDarkQuery(item, profile) {
       box.classList.toggle("show", show);
     }
 
-    function syncTrendBoardPicker() {
+    function syncTrendBoardPicker(preserveInput = false) {
       const input = $("trendBoardInput");
       if (!input) return;
       const key = state.type || "industry";
       const options = state.trendBoardOptions[key] || [];
-      input.classList.toggle("busy", !options.length);
-      input.placeholder = options.length ? "搜索行业名称或代码" : "行业目录加载中…";
-      input.value = state.trendBoardCode ? (state.trendBoardName || state.trendBoardCode) : "";
+      const pending = !!state.trendBoardOptionsPending[key];
+      const error = state.trendBoardOptionsError[key] || "";
+      input.classList.toggle("busy", pending || (!options.length && !!error));
+      input.placeholder = options.length
+        ? "搜索行业名称或代码"
+        : (pending ? "行业目录加载中…" : (error ? "目录加载失败，点击重试" : "搜索行业名称或代码"));
+      input.title = error ? "行业目录加载失败：" + error + "。点击输入框可重试" : "";
+      if (!preserveInput || state.trendBoardCode) {
+        input.value = state.trendBoardCode ? (state.trendBoardName || state.trendBoardCode) : "";
+      }
     }
 
     async function loadTrendBoardOptions(force = false) {
       const key = state.type || "industry";
-      if (!force && Array.isArray(state.trendBoardOptions[key])) {
+      const cached = state.trendBoardOptions[key];
+      if (!force && Array.isArray(cached) && cached.length) {
         syncTrendBoardPicker();
-        return state.trendBoardOptions[key];
+        return cached;
       }
+      if (state.trendBoardOptionsPending[key]) return state.trendBoardOptionsPending[key];
       const el = $("trendBoardInput");
+      const previous = Array.isArray(cached) && cached.length ? cached : null;
       if (el) {
         el.disabled = true;
         el.classList.add("busy");
         el.placeholder = "行业目录加载中…";
       }
-      try {
-        const q = new URLSearchParams({ type: key, primary_only: "0" });
-        const data = await fetchJson(API_BASE + "/api/sector/options?" + q.toString(), FETCH_DEFAULTS.options);
-        if (!data.ok) throw new Error(data.error || "板块目录加载失败");
-        state.trendBoardOptions[key] = (data.items || []).filter((item) => item && item.code && item.name);
-        syncTrendBoardPicker();
-        return state.trendBoardOptions[key];
-      } catch (e) {
-        state.trendBoardOptions[key] = [];
-        if (el) {
-          el.placeholder = "行业目录暂不可用";
-          el.classList.add("busy");
+      const request = (async () => {
+        try {
+          const q = new URLSearchParams({ type: key, primary_only: "0" });
+          const data = await fetchJson(API_BASE + "/api/sector/options?" + q.toString(), FETCH_DEFAULTS.options);
+          if (!data.ok) throw new Error(data.error || "板块目录加载失败");
+          const items = (data.items || []).filter((item) => item && item.code && item.name);
+          if (!items.length && Number(data.count || 0) > 0) throw new Error("目录返回为空");
+          state.trendBoardOptions[key] = items;
+          state.trendBoardOptionsError[key] = "";
+          return items;
+        } catch (e) {
+          const detail = String((e && e.message) || e || "请求失败");
+          state.trendBoardOptionsError[key] = detail;
+          if (previous) state.trendBoardOptions[key] = previous;
+          else delete state.trendBoardOptions[key];
+          if ($("trendStatus")) $("trendStatus").textContent = "行业目录加载失败：" + detail + "，输入框可重试";
+          return previous || [];
+        } finally {
+          delete state.trendBoardOptionsPending[key];
+          if (el) el.disabled = false;
+          syncTrendBoardPicker(!state.trendBoardCode && !!(el && el.value));
         }
-        if ($("trendStatus")) $("trendStatus").textContent = "板块目录加载失败，保留多板模式";
-        return [];
-      } finally {
-        if (el) el.disabled = false;
-      }
+      })();
+      state.trendBoardOptionsPending[key] = request;
+      return request;
     }
 
     async function refreshTrend(manual = false) {
@@ -3386,8 +3411,13 @@ function renderMarket(data) {
       setActiveSeg("trendLimitSeg", "data-limit", String(state.trendLimit));
       refreshTrend(true);
     });
-    $("trendBoardInput").addEventListener("focus", () => {
-      renderTrendBoardResults($("trendBoardInput").value || "", true);
+    $("trendBoardInput").addEventListener("focus", async () => {
+      const input = $("trendBoardInput");
+      const key = state.type || "industry";
+      if (!(state.trendBoardOptions[key] || []).length) {
+        await loadTrendBoardOptions(false);
+      }
+      renderTrendBoardResults(input.value || "", true);
     });
     $("trendBoardInput").addEventListener("input", (e) => {
       const value = e.target.value || "";
@@ -3397,6 +3427,13 @@ function renderMarket(data) {
         state.trendBoardName = "";
       }
       renderTrendBoardResults(value, true);
+      const key = state.type || "industry";
+      if (!(state.trendBoardOptions[key] || []).length) {
+        loadTrendBoardOptions(false).then(() => {
+          const input = $("trendBoardInput");
+          if (input && input.value === value) renderTrendBoardResults(value, true);
+        });
+      }
     });
     $("trendBoardResults").addEventListener("click", (e) => {
       const btn = e.target.closest("button[data-code]");
@@ -3586,6 +3623,7 @@ function renderMarket(data) {
       setActiveSeg("typeSeg", "data-type", state.type);
       state.trendBoardCode = "";
       state.trendBoardName = "";
+      syncTrendBoardPicker();
       loadTrendBoardOptions(true);
       refresh(true);
     });

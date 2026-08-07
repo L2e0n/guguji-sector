@@ -111,29 +111,49 @@
     }
 
     .vol-pace-wrap {
-      margin-top: 6px;
-      padding-top: 4px;
-      border-top: 1px dashed #e6ebf2;
+      margin-top: 8px;
+      padding-top: 8px;
       flex: 0 0 auto;
       overflow: visible;
       min-width: 0;
     }
-    .vol-pace-head {
-      display: flex; justify-content: space-between; align-items: baseline; gap: 6px;
-      font-size: 11px; color: #666; margin-bottom: 2px;
+    .vol-pace-summary { display: grid; gap: 6px; margin-bottom: 8px; }
+    .vol-pace-summary-row {
+      display: flex; align-items: center; flex-wrap: wrap; gap: 5px;
+      min-width: 0; color: #17191d; font-size: 12px; line-height: 1.25;
+      font-variant-numeric: tabular-nums;
     }
-    .vol-pace-head .subk { font-size: 10px; font-weight: 500; color: #999; white-space: nowrap; }
-    .vol-pace-legend {
-      display: inline-flex; align-items: center; gap: 8px; font-size: 10px; color: #888;
-      margin-bottom: 2px;
+    .vol-pace-summary-row .marker {
+      width: 22px; height: 22px; flex: 0 0 22px; border-radius: 5px;
+      box-sizing: border-box; display: inline-grid; place-items: center;
+      font-size: 13px; font-weight: 800; line-height: 1;
     }
-    .vol-pace-legend i {
-      display: inline-block; width: 10px; height: 2px; border-radius: 1px; vertical-align: middle; margin-right: 3px;
+    .vol-pace-summary-row .marker.actual {
+      color: #7f8791; background: #f5f6f8; border: 1px solid #d8dce1;
     }
-    .vol-pace-legend .acc i { background: #c0392b; box-shadow: 0 0 0 2px rgba(192,57,43,0.12); }
-    .vol-pace-legend .dec i { background: #1e8449; box-shadow: 0 0 0 2px rgba(30,132,73,0.12); }
-    .vol-pace-chart { position: relative; width: 100%; height: 120px; overflow: visible; }
-    .vol-pace-chart canvas { width: 100%; height: 120px; display: block; }
+    .vol-pace-summary-row .marker.forecast { background: #ef3338; border: 1px solid #ef3338; }
+    .vol-pace-summary-row .divider { color: #a4a8ad; margin: 0 2px; }
+    .vol-pace-summary-row .label { color: #25282d; }
+    .vol-pace-summary-row .value { font-size: 15px; font-weight: 700; margin-left: 2px; }
+    .vol-pace-summary-row .unit { font-size: 12px; color: #30343a; margin-left: -3px; }
+    .vol-pace-summary-row .detail { font-size: 13px; font-weight: 700; margin-left: 2px; }
+    .vol-pace-summary-row.forecast .label,
+    .vol-pace-summary-row.forecast .value,
+    .vol-pace-summary-row.forecast .unit,
+    .vol-pace-summary-row.forecast .detail { color: #c7353a; }
+    .vol-pace-chart { position: relative; width: 100%; height: 150px; overflow: visible; }
+    .vol-pace-chart canvas { width: 100%; height: 150px; display: block; }
+    .vol-pace-baseline {
+      position: absolute; right: 5px; top: 50%; transform: translateY(-50%);
+      display: inline-flex; align-items: center; gap: 7px; padding: 3px 5px;
+      background: rgba(255,255,255,.88); color: #9a9da2; font-size: 11px;
+      line-height: 1.2; white-space: nowrap; pointer-events: none;
+      font-variant-numeric: tabular-nums;
+    }
+    .vol-pace-baseline .marker {
+      width: 10px; height: 10px; flex: 0 0 10px; background: #3188d0;
+    }
+    .vol-pace-baseline b { color: #a0a3a8; font-weight: 700; }
     .vol-pace-empty {
       position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
       color: #aaa; font-size: 11px; pointer-events: none;
@@ -702,25 +722,16 @@
       flex: 0 0 auto;
     }
     .overview-card .vol-panel .vol-pace-wrap {
-      margin-top: 6px;
-      padding-top: 6px;
+      margin-top: 8px;
+      padding-top: 8px;
       flex: 0 0 auto;
     }
-    .overview-card .vol-panel .vol-pace-head {
-      font-size: 12px !important;
-      margin-bottom: 3px;
-    }
-    .overview-card .vol-panel .vol-pace-head .subk {
-      font-size: 11px !important;
-    }
-    .overview-card .vol-panel .vol-pace-legend {
-      font-size: 11px !important;
-      margin-bottom: 3px;
-      gap: 6px;
-    }
+    .overview-card .vol-panel .vol-pace-summary-row { font-size: 12px !important; }
+    .overview-card .vol-panel .vol-pace-summary-row .value { font-size: 15px !important; }
+    .overview-card .vol-panel .vol-pace-summary-row .detail { font-size: 12px !important; }
     .overview-card .vol-panel .vol-pace-chart,
     .overview-card .vol-panel .vol-pace-chart canvas {
-      height: 120px !important;
+      height: 150px !important;
     }
     .overview-card .vol-panel .vol-pace-foot {
       margin-top: 3px;
@@ -903,20 +914,30 @@
           </table>
           <div id="volVsPrev" class="vol-vs-prev">量能：—</div>
           <div class="vol-pace-wrap">
-            <div class="vol-pace-head">
-              <span>量能比值</span>
-              <span class="subk" id="volPaceMeta">较昨增量% · 0=持平</span>
-            </div>
-            <div class="vol-pace-legend" id="volPaceLegend" title="纵轴=csbl=(今日预测量能/昨日实际-1)×100%；0=与昨日持平">
-              <span class="acc"><i></i>&gt;0 放量</span>
-              <span class="dec"><i></i>&lt;0 缩量</span>
-              <span style="color:#aaa">基准 0</span>
+            <div class="vol-pace-summary" aria-label="量能比值摘要">
+              <div class="vol-pace-summary-row actual">
+                <span class="marker actual" aria-hidden="true">▤</span>
+                <span class="label">沪深京</span><span class="divider">|</span>
+                <span class="label">实际量能</span>
+                <b class="value" id="volPaceActual">—</b><span class="unit">亿</span>
+              </div>
+              <div class="vol-pace-summary-row forecast">
+                <span class="marker forecast" aria-hidden="true"></span>
+                <span class="label">今日</span><span class="divider">|</span>
+                <span class="label">预测量能</span>
+                <b class="value" id="volPaceForecast">—</b><span class="unit">亿</span>
+                <span class="detail" id="volPaceForecastDetail">（—）</span>
+              </div>
             </div>
             <div class="vol-pace-chart">
-              <canvas id="volPaceCanvas" height="120"></canvas>
+              <canvas id="volPaceCanvas" height="150"></canvas>
+              <div class="vol-pace-baseline" id="volPaceBaseline">
+                <span class="marker" aria-hidden="true"></span>
+                <span>昨日&nbsp;|&nbsp;总量能&nbsp;<b id="volPacePrev">—</b>亿</span>
+              </div>
               <div class="vol-pace-empty" id="volPaceEmpty">等待分时路径…</div>
             </div>
-            <div class="vol-pace-foot" id="volPaceFoot">—</div>
+            <div class="vol-pace-foot" id="volPaceFoot"><span class="up">红色=放量</span> · <span class="down">绿色=缩量</span></div>
           </div>
         </div>
         <div class="market-panel limit-panel">
@@ -3007,9 +3028,13 @@ function renderMarket(data) {
         const canvas = $("volPaceCanvas");
         const empty = $("volPaceEmpty");
         const foot = $("volPaceFoot");
-        const meta = $("volPaceMeta");
+        const actualEl = $("volPaceActual");
+        const forecastEl = $("volPaceForecast");
+        const forecastDetailEl = $("volPaceForecastDetail");
+        const prevEl = $("volPacePrev");
+        const baselineEl = $("volPaceBaseline");
         if (!canvas) return;
-        const CH = Math.max(100, Math.round((canvas.parentElement && canvas.parentElement.clientHeight) || canvas.clientHeight || 120));
+        const CH = Math.max(120, Math.round((canvas.parentElement && canvas.parentElement.clientHeight) || canvas.clientHeight || 150));
         const pace = vol.vs_prev_pace || {};
         const rawPts = pace.points || [];
         const pts = rawPts.map(function (p) {
@@ -3029,10 +3054,24 @@ function renderMarket(data) {
         }).filter(Boolean);
         const latest = pace.latest || (pts.length ? pts[pts.length - 1] : null);
 
-        if (meta) {
-          meta.textContent = pts.length
-            ? ("较昨增量% · " + pts.length + "点 · 0=持平")
-            : "较昨增量% · 0=持平";
+        const total = vol.total || {};
+        const actualYi = total.amount_yi != null ? Number(total.amount_yi) : (
+          Number(vol.hs && vol.hs.amount_yi || 0) + Number(vol.bj && vol.bj.amount_yi || 0)
+        );
+        if (actualEl) actualEl.textContent = Number.isFinite(actualYi) && actualYi > 0 ? actualYi.toFixed(2) : "—";
+        if (prevEl) {
+          const prevYi = latest && latest.prev_yi != null ? Number(latest.prev_yi) : Number((vol.vs_prev || {}).prev_total_amount_yi);
+          prevEl.textContent = Number.isFinite(prevYi) && prevYi > 0 ? prevYi.toFixed(0) : "—";
+          if (baselineEl) baselineEl.style.display = Number.isFinite(prevYi) && prevYi > 0 ? "inline-flex" : "none";
+        }
+        if (forecastEl && forecastDetailEl) {
+          const predYi = latest && latest.implied_yi != null ? Number(latest.implied_yi) : NaN;
+          const csbl = latest && latest.csbl != null ? Number(latest.csbl) : NaN;
+          const delta = latest && latest.delta_yi != null ? Number(latest.delta_yi) : NaN;
+          forecastEl.textContent = Number.isFinite(predYi) ? Math.round(predYi).toString() : "—";
+          forecastDetailEl.textContent = Number.isFinite(csbl) && Number.isFinite(delta)
+            ? "（" + (csbl < 0 ? "" : "") + csbl.toFixed(2) + "%，增量" + (delta < 0 ? "" : "") + Math.round(delta) + "亿）"
+            : "（—）";
         }
 
         if (!pts.length) {
@@ -3040,7 +3079,7 @@ function renderMarket(data) {
             empty.style.display = "flex";
             empty.textContent = "等待比值序列…";
           }
-          if (foot) foot.textContent = "—";
+          if (foot) foot.innerHTML = "<span class=\"up\">红色=放量</span> · <span class=\"down\">绿色=缩量</span>";
           const ctx0 = canvas.getContext("2d");
           if (ctx0) {
             const dpr0 = window.devicePixelRatio || 1;
@@ -3065,28 +3104,24 @@ function renderMarket(data) {
         ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
         ctx.clearRect(0, 0, cssW, cssH);
 
-        const pad = { l: 44, r: 8, t: 16, b: 18 };
+        const pad = { l: 36, r: 8, t: 16, b: 20 };
         const W = Math.max(10, cssW - pad.l - pad.r);
         const H = Math.max(10, cssH - pad.t - pad.b);
 
-        let ymin = 0, ymax = 0;
+        let rawMin = 0, rawMax = 0;
         pts.forEach(function (p) {
           const v = Number(p._csbl);
-          ymin = Math.min(ymin, v);
-          ymax = Math.max(ymax, v);
+          rawMin = Math.min(rawMin, v);
+          rawMax = Math.max(rawMax, v);
         });
-        // always include baseline 0, leave breathing room
-        ymin = Math.min(ymin, -5);
-        ymax = Math.max(ymax, 5);
-        let padY = Math.max(2, (ymax - ymin) * 0.18);
-        ymin = ymin - padY;
-        ymax = ymax + padY;
-        // soft clamp extreme axes
-        if (ymin < -80) ymin = Math.min(-5, Number(pts.reduce((m,p)=>Math.min(m,p._csbl),0)) - 3);
-        if (ymax > 150) ymax = Math.max(5, Number(pts.reduce((m,p)=>Math.max(m,p._csbl),0)) + 3);
+        // Keep the reference layout stable at ±20%; expand only when the live path would clip.
+        const axisMax = Math.max(20, Math.ceil(Math.max(Math.abs(rawMin), Math.abs(rawMax)) / 10) * 10);
+        const ymin = -axisMax, ymax = axisMax;
 
-        const xOf = function (i) {
-          return pad.l + (pts.length === 1 ? W / 2 : (i / (pts.length - 1)) * W);
+        // The x-axis is the complete 09:30-15:00 session; future points remain blank.
+        const xOf = function (idx) {
+          const sessionIdx = Math.max(0, Math.min(239, Number(idx) || 0));
+          return pad.l + (sessionIdx / 239) * W;
         };
         const yOf = function (v) {
           const vv = Math.max(ymin, Math.min(ymax, Number(v)));
@@ -3096,20 +3131,18 @@ function renderMarket(data) {
         const fmtCsbl = function (v) {
           const n = Number(v);
           if (!Number.isFinite(n)) return "—";
-          const sign = n > 0 ? "+" : "";
-          const body = Math.abs(n) >= 10 ? Math.round(n).toString() : n.toFixed(1);
-          return sign + body + "%";
+          return (n === 0 ? "0" : Math.round(n).toString()) + "%";
         };
 
         // samples with 0 crossings for dual-tone split
         const samples = [];
         for (let i = 0; i < pts.length; i++) {
-          samples.push({ v: Number(pts[i]._csbl), x: xOf(i), y: yOf(Number(pts[i]._csbl)) });
+          samples.push({ v: Number(pts[i]._csbl), x: xOf(pts[i].idx), y: yOf(Number(pts[i]._csbl)) });
           if (i < pts.length - 1) {
             const v0 = Number(pts[i]._csbl), v1 = Number(pts[i + 1]._csbl);
             if ((v0 > 0 && v1 < 0) || (v0 < 0 && v1 > 0)) {
               const r = Math.abs(v0) / (Math.abs(v0) + Math.abs(v1));
-              const xz = xOf(i) + (xOf(i + 1) - xOf(i)) * r;
+              const xz = xOf(pts[i].idx) + (xOf(pts[i + 1].idx) - xOf(pts[i].idx)) * r;
               samples.push({ v: 0, x: xz, y: yOf(0), z: true });
             }
           }
@@ -3118,20 +3151,44 @@ function renderMarket(data) {
         ctx.fillStyle = "#fcfdff";
         ctx.fillRect(0, 0, cssW, cssH);
 
-        // baseline 0 = 与昨持平
+        // Reference-style grid: dashed ±10/±20, solid blue 0 baseline.
         const y0 = yOf(0);
-        ctx.strokeStyle = "#c5ccd6";
         ctx.lineWidth = 1;
-        ctx.setLineDash([4, 3]);
+        [-axisMax, -10, 10, axisMax].forEach(function (v) {
+          if (v === 0 || Math.abs(v) > axisMax) return;
+          const gy = yOf(v);
+          ctx.strokeStyle = "#c9cdd2";
+          ctx.setLineDash([6, 4]);
+          ctx.beginPath();
+          ctx.moveTo(pad.l, gy);
+          ctx.lineTo(pad.l + W, gy);
+          ctx.stroke();
+        });
+        ctx.setLineDash([]);
+        ctx.strokeStyle = "#3188d0";
+        ctx.lineWidth = 1.6;
         ctx.beginPath();
         ctx.moveTo(pad.l, y0);
         ctx.lineTo(pad.l + W, y0);
         ctx.stroke();
-        ctx.setLineDash([]);
+        ctx.strokeStyle = "#9da3aa";
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(pad.l, pad.t);
+        ctx.lineTo(pad.l, pad.t + H);
+        ctx.stroke();
         ctx.fillStyle = "#9aa3af";
-        ctx.font = "10px sans-serif";
-        ctx.textAlign = "left";
-        ctx.fillText("0", 2, y0 + 3);
+        ctx.font = "11px sans-serif";
+        ctx.textAlign = "right";
+        ctx.fillText("0", pad.l - 6, y0 + 4);
+        [axisMax, 10].forEach(function (v) {
+          ctx.fillStyle = "#bd3c42";
+          ctx.fillText(fmtCsbl(v), pad.l - 6, yOf(v) + 4);
+        });
+        [-10, -axisMax].forEach(function (v) {
+          ctx.fillStyle = "#2c9860";
+          ctx.fillText(fmtCsbl(v), pad.l - 6, yOf(v) + 4);
+        });
 
         function fillBand(above) {
           ctx.beginPath();
@@ -3190,7 +3247,7 @@ function renderMarket(data) {
 
         const last = Number(pts[pts.length - 1]._csbl);
         const col = last > 0.5 ? "#c0392b" : (last < -0.5 ? "#1e8449" : "#5d6d7e");
-        const ex = xOf(pts.length - 1), ey = yOf(last);
+        const ex = xOf(pts[pts.length - 1].idx), ey = yOf(last);
         ctx.fillStyle = col;
         ctx.beginPath();
         ctx.arc(ex, ey, 2.8, 0, Math.PI * 2);
@@ -3199,55 +3256,15 @@ function renderMarket(data) {
         ctx.lineWidth = 1;
         ctx.stroke();
 
-        // x labels
+        // x labels use the full session axis, including the blank afternoon.
         ctx.fillStyle = "#9aa3af";
         ctx.font = "10px sans-serif";
-        ctx.textAlign = "center";
-        const labelIdx = [0, Math.floor((pts.length - 1) / 2), pts.length - 1];
-        const seen = {};
-        labelIdx.forEach(function (i) {
-          if (seen[i]) return; seen[i] = 1;
-          const label = pts[i].t || "";
-          if (!label) return;
-          const tx = Math.min(cssW - 14, Math.max(pad.l, xOf(i)));
-          ctx.fillText(label, tx, cssH - 3);
+        [[0, "09:30"], [60, "10:30"], [120, "11:30"], [150, "14:00"], [239, "15:00"]].forEach(function (item) {
+          ctx.textAlign = item[0] === 0 ? "left" : (item[0] === 239 ? "right" : "center");
+          ctx.fillText(item[1], xOf(item[0]), cssH - 4);
         });
 
-        // y labels
-        ctx.textAlign = "right";
-        ctx.fillText(fmtCsbl(ymax), pad.l - 4, pad.t + 9);
-        ctx.fillText(fmtCsbl(ymin), pad.l - 4, pad.t + H - 1);
-        ctx.textAlign = "left";
-
-        if (foot && latest) {
-          let csblN = latest.csbl != null ? Number(latest.csbl) : NaN;
-          if (!Number.isFinite(csblN) && latest.pace != null) csblN = (Number(latest.pace) - 1) * 100;
-          if (!Number.isFinite(csblN) && pts.length) csblN = Number(pts[pts.length - 1]._csbl);
-          const rN = Number.isFinite(csblN) ? (1 + csblN / 100) : NaN;
-          const predYi = latest.implied_yi != null ? Number(latest.implied_yi) : (
-            Number.isFinite(rN) && latest.prev_yi != null ? rN * Number(latest.prev_yi) : NaN
-          );
-          const dYi = latest.delta_yi != null ? Number(latest.delta_yi) : (
-            Number.isFinite(predYi) && latest.prev_yi != null
-              ? predYi - Number(latest.prev_yi)
-              : NaN
-          );
-          const levelLabel = latest.level_label
-            || (Number.isFinite(csblN) ? (csblN > 0.5 ? "放量" : (csblN < -0.5 ? "缩量" : "持平")) : "—");
-          const rCls = Number.isFinite(csblN) ? (csblN > 0.5 ? "up" : (csblN < -0.5 ? "down" : "")) : "";
-          const dCls = Number.isFinite(dYi) ? (dYi > 1 ? "up" : (dYi < -1 ? "down" : "")) : "";
-          const predTxt = Number.isFinite(predYi) ? (Math.round(predYi) + "亿") : "—";
-          const csblTxt = Number.isFinite(csblN)
-            ? ((csblN >= 0 ? "+" : "") + csblN.toFixed(1) + "%")
-            : "—";
-          const dTxt = Number.isFinite(dYi)
-            ? ((dYi > 0 ? "+" : "") + dYi.toFixed(0) + "亿")
-            : "—";
-          // 展示：预测xxxx亿 (+csbl%, 增量xxx亿)
-          foot.innerHTML =
-            '<span class="' + rCls + '">预测' + predTxt + " (" + csblTxt + ", 增量" + dTxt + ")</span>"
-            + ' · <span class="' + dCls + '">' + levelLabel + "</span>";
-        }
+        if (foot) foot.innerHTML = "<span class=\"up\">红色=放量</span> · <span class=\"down\">绿色=缩量</span>";
       })();
 
 

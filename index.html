@@ -144,9 +144,10 @@
     .vol-pace-chart { position: relative; width: 100%; height: 150px; overflow: visible; }
     .vol-pace-chart canvas { width: 100%; height: 150px; display: block; }
     .vol-pace-baseline {
-      position: absolute; right: 5px; top: 50%; transform: translateY(-50%);
-      display: inline-flex; align-items: center; gap: 7px; padding: 3px 5px;
-      background: rgba(255,255,255,.88); color: #9a9da2; font-size: 11px;
+      display: flex; width: 100%; box-sizing: border-box;
+      justify-content: flex-end; align-items: center; gap: 7px;
+      margin: 0 0 3px; padding: 0 5px 0 0;
+      background: transparent; color: #9a9da2; font-size: 11px;
       line-height: 1.2; white-space: nowrap; pointer-events: none;
       font-variant-numeric: tabular-nums;
     }
@@ -929,14 +930,14 @@
                 <span class="detail" id="volPaceForecastDetail">（—）</span>
               </div>
             </div>
-            <div class="vol-pace-chart">
-              <canvas id="volPaceCanvas" height="150"></canvas>
               <div class="vol-pace-baseline" id="volPaceBaseline">
                 <span class="marker" aria-hidden="true"></span>
                 <span>昨日&nbsp;|&nbsp;总量能&nbsp;<b id="volPacePrev">—</b>亿</span>
               </div>
-              <div class="vol-pace-empty" id="volPaceEmpty">等待分时路径…</div>
-            </div>
+              <div class="vol-pace-chart">
+                <canvas id="volPaceCanvas" height="150"></canvas>
+                <div class="vol-pace-empty" id="volPaceEmpty">等待分时路径…</div>
+              </div>
             <div class="vol-pace-foot" id="volPaceFoot"><span class="up">红色=放量</span> · <span class="down">绿色=缩量</span></div>
           </div>
         </div>
@@ -3062,7 +3063,7 @@ function renderMarket(data) {
         if (prevEl) {
           const prevYi = latest && latest.prev_yi != null ? Number(latest.prev_yi) : Number((vol.vs_prev || {}).prev_total_amount_yi);
           prevEl.textContent = Number.isFinite(prevYi) && prevYi > 0 ? prevYi.toFixed(0) : "—";
-          if (baselineEl) baselineEl.style.display = Number.isFinite(prevYi) && prevYi > 0 ? "inline-flex" : "none";
+          if (baselineEl) baselineEl.style.display = Number.isFinite(prevYi) && prevYi > 0 ? "flex" : "none";
         }
         if (forecastEl && forecastDetailEl) {
           const predYi = latest && latest.implied_yi != null ? Number(latest.implied_yi) : NaN;

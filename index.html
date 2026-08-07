@@ -218,15 +218,30 @@
     .lg-dot { width: 8px; height: 8px; border-radius: 50%; flex: 0 0 auto; }
     .lg-val { font-variant-numeric: tabular-nums; font-weight: 700; }
     .chart-toolbar { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-bottom: 8px; }
-    .trend-board-select {
-      min-width: 156px; max-width: 220px; height: 30px; padding: 0 26px 0 9px;
+    .trend-board-picker { position: relative; min-width: 190px; max-width: 260px; }
+    .trend-board-input {
+      width: 100%; height: 30px; box-sizing: border-box; padding: 0 9px;
       border: 1px solid #eadfb4; border-radius: 7px; background: #fffef8;
-      color: #5d4b00; font-size: 12px; outline: none; cursor: pointer;
+      color: #5d4b00; font-size: 12px; outline: none;
     }
-    .trend-board-select:focus { border-color: #e0b900; box-shadow: 0 0 0 2px rgba(224,185,0,.14); }
-    .trend-board-select.busy { color: #999; }
+    .trend-board-input:focus { border-color: #e0b900; box-shadow: 0 0 0 2px rgba(224,185,0,.14); }
+    .trend-board-input.busy { color: #999; }
+    .trend-board-results {
+      display: none; position: absolute; z-index: 30; left: 0; right: 0; top: 34px;
+      max-height: 280px; overflow: auto; padding: 4px; background: #fffef8;
+      border: 1px solid #eadfb4; border-radius: 8px; box-shadow: 0 10px 24px rgba(80,60,10,.14);
+    }
+    .trend-board-results.show { display: block; }
+    .trend-board-result {
+      display: flex; justify-content: space-between; gap: 8px; width: 100%; padding: 7px 8px;
+      border: 0; border-radius: 6px; background: transparent; color: #4d430f;
+      text-align: left; font-size: 12px; cursor: pointer;
+    }
+    .trend-board-result:hover, .trend-board-result.active { background: #fff1b8; }
+    .trend-board-result .code { color: #999; font-size: 10px; }
+    .trend-board-empty { padding: 8px; color: #999; font-size: 11px; }
     @media (max-width: 640px) {
-      .trend-board-select { flex: 1 1 170px; min-width: 150px; max-width: none; }
+      .trend-board-picker { flex: 1 1 190px; min-width: 160px; max-width: none; }
     }
     .chart-tip {
       font-size: 11px; color: var(--muted); margin-top: 6px; line-height: 1.4;
@@ -968,9 +983,11 @@
           <button type="button" class="btn active" data-limit="10">10板</button>
           <button type="button" class="btn secondary" data-limit="20">聚焦前20</button>
         </div>
-        <select id="trendBoardSelect" class="trend-board-select" aria-label="选择轨迹板块">
-          <option value="">全部板块（多板轨迹）</option>
-        </select>
+        <div class="trend-board-picker" id="trendBoardPicker">
+          <input id="trendBoardInput" class="trend-board-input" type="search"
+            placeholder="搜索行业名称或代码" autocomplete="off" aria-label="搜索轨迹板块" />
+          <div id="trendBoardResults" class="trend-board-results" role="listbox"></div>
+        </div>
         <button id="trendRefreshBtn" class="btn secondary" type="button">刷新轨迹</button>
         <span class="status-pill" id="trendStatus">轨迹待命</span>
       </div>
@@ -2622,45 +2639,75 @@ function renderDarkQuery(item, profile) {
       });
     }
 
-    function syncTrendBoardSelect() {
-      const el = $("trendBoardSelect");
-      if (!el) return;
+    function trendBoardMatches(query) {
       const key = state.type || "industry";
       const options = state.trendBoardOptions[key] || [];
-      const current = state.trendBoardCode || "";
-      el.innerHTML = '<option value="">全部板块（多板轨迹）</option>' + options.map((item) => {
-        const opt = document.createElement("option");
-        opt.value = item.code;
-        opt.textContent = item.name;
-        return opt.outerHTML;
-      }).join("");
-      el.value = options.some((item) => item.code === current) ? current : "";
-      el.classList.toggle("busy", !options.length);
+      const q = String(query || "").trim().toLowerCase();
+      if (!q) return options.slice(0, 20);
+      return options.filter((item) =>
+        String(item.name || "").toLowerCase().includes(q)
+        || String(item.code || "").toLowerCase().includes(q)
+      ).slice(0, 20);
+    }
+
+    function escapeTrendText(value) {
+      return String(value == null ? "" : value).replace(/[&<>\"]/g, (ch) => ({
+        "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;"
+      }[ch]));
+    }
+
+    function renderTrendBoardResults(query, show = true) {
+      const box = $("trendBoardResults");
+      if (!box) return;
+      const matches = trendBoardMatches(query);
+      const q = String(query || "").trim();
+      const allItem = '<button type="button" class="trend-board-result" data-code="">'
+        + '<span>全部板块（多板轨迹）</span><span class="code">清除选择</span></button>';
+      if (!matches.length && q) {
+        box.innerHTML = '<div class="trend-board-empty">没有匹配的行业</div>';
+      } else {
+        box.innerHTML = allItem + matches.map((item) =>
+          `<button type="button" class="trend-board-result" data-code="${escapeTrendText(item.code)}">
+            <span>${escapeTrendText(item.name)}</span><span class="code">${escapeTrendText(item.code)}</span>
+          </button>`
+        ).join("");
+      }
+      box.classList.toggle("show", show);
+    }
+
+    function syncTrendBoardPicker() {
+      const input = $("trendBoardInput");
+      if (!input) return;
+      const key = state.type || "industry";
+      const options = state.trendBoardOptions[key] || [];
+      input.classList.toggle("busy", !options.length);
+      input.placeholder = options.length ? "搜索行业名称或代码" : "行业目录加载中…";
+      input.value = state.trendBoardCode ? (state.trendBoardName || state.trendBoardCode) : "";
     }
 
     async function loadTrendBoardOptions(force = false) {
       const key = state.type || "industry";
       if (!force && Array.isArray(state.trendBoardOptions[key])) {
-        syncTrendBoardSelect();
+        syncTrendBoardPicker();
         return state.trendBoardOptions[key];
       }
-      const el = $("trendBoardSelect");
+      const el = $("trendBoardInput");
       if (el) {
         el.disabled = true;
         el.classList.add("busy");
-        el.innerHTML = '<option value="">板块目录加载中…</option>';
+        el.placeholder = "行业目录加载中…";
       }
       try {
-        const q = new URLSearchParams({ type: key, primary_only: "1" });
+        const q = new URLSearchParams({ type: key, primary_only: "0" });
         const data = await fetchJson(API_BASE + "/api/sector/options?" + q.toString(), FETCH_DEFAULTS.options);
         if (!data.ok) throw new Error(data.error || "板块目录加载失败");
         state.trendBoardOptions[key] = (data.items || []).filter((item) => item && item.code && item.name);
-        syncTrendBoardSelect();
+        syncTrendBoardPicker();
         return state.trendBoardOptions[key];
       } catch (e) {
         state.trendBoardOptions[key] = [];
         if (el) {
-          el.innerHTML = '<option value="">板块目录暂不可用</option>';
+          el.placeholder = "行业目录暂不可用";
           el.classList.add("busy");
         }
         if ($("trendStatus")) $("trendStatus").textContent = "板块目录加载失败，保留多板模式";
@@ -3339,14 +3386,35 @@ function renderMarket(data) {
       setActiveSeg("trendLimitSeg", "data-limit", String(state.trendLimit));
       refreshTrend(true);
     });
-    $("trendBoardSelect").addEventListener("change", (e) => {
-      const code = e.target.value || "";
+    $("trendBoardInput").addEventListener("focus", () => {
+      renderTrendBoardResults($("trendBoardInput").value || "", true);
+    });
+    $("trendBoardInput").addEventListener("input", (e) => {
+      const value = e.target.value || "";
+      // Typing after a selection returns to the searchable all-board mode.
+      if (state.trendBoardCode && value !== state.trendBoardName) {
+        state.trendBoardCode = "";
+        state.trendBoardName = "";
+      }
+      renderTrendBoardResults(value, true);
+    });
+    $("trendBoardResults").addEventListener("click", (e) => {
+      const btn = e.target.closest("button[data-code]");
+      if (!btn) return;
+      const code = btn.getAttribute("data-code") || "";
       const options = state.trendBoardOptions[state.type] || [];
       const selected = options.find((item) => item.code === code);
       state.trendBoardCode = code;
-      state.trendBoardName = selected ? selected.name : "";
+      state.trendBoardName = selected ? selected.name : code;
       state.trendHidden = {};
+      syncTrendBoardPicker();
+      $("trendBoardResults").classList.remove("show");
       refreshTrend(true);
+    });
+    document.addEventListener("click", (e) => {
+      if (e.target.closest("#trendBoardPicker")) return;
+      const box = $("trendBoardResults");
+      if (box) box.classList.remove("show");
     });
     $("trendRefreshBtn").addEventListener("click", () => refreshTrend(true));
     bindTrendCanvas();

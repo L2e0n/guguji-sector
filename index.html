@@ -3064,14 +3064,22 @@ function renderMarket(data) {
         const W = Math.max(10, cssW - pad.l - pad.r);
         const H = Math.max(10, cssH - pad.t - pad.b);
 
-        let rawMin = 0, rawMax = 0;
-        pts.forEach(function (p) {
-          const v = Number(p._csbl);
-          rawMin = Math.min(rawMin, v);
-          rawMax = Math.max(rawMax, v);
-        });
-        // Keep the reference layout stable at ±20%; expand only when the live path would clip.
-        const axisMax = Math.max(20, Math.ceil(Math.max(Math.abs(rawMin), Math.abs(rawMax)) / 10) * 10);
+        // Use the main distribution for the scale so one incomplete opening estimate
+        // cannot flatten the rest of the intraday path. Outliers remain clipped at the edge.
+        const scaleValues = pts.map(function (p) { return Number(p._csbl); })
+          .filter(function (v) { return Number.isFinite(v); })
+          .sort(function (a, b) { return a - b; });
+        const quantile = function (values, q) {
+          if (!values.length) return 0;
+          const pos = (values.length - 1) * q;
+          const lo = Math.floor(pos), hi = Math.ceil(pos);
+          if (lo === hi) return values[lo];
+          return values[lo] + (values[hi] - values[lo]) * (pos - lo);
+        };
+        const scaleLow = quantile(scaleValues, 0.05);
+        const scaleHigh = quantile(scaleValues, 0.95);
+        const scaleAbs = Math.max(Math.abs(scaleLow), Math.abs(scaleHigh), 1);
+        const axisMax = Math.max(10, Math.ceil((scaleAbs * 1.2) / 5) * 5);
         const ymin = -axisMax, ymax = axisMax;
 
         // The x-axis is the complete 09:30-15:00 session; future points remain blank.
@@ -3107,10 +3115,14 @@ function renderMarket(data) {
         ctx.fillStyle = "#fcfdff";
         ctx.fillRect(0, 0, cssW, cssH);
 
-        // Reference-style grid: dashed ±10/±20, solid blue 0 baseline.
+        // Adaptive grid: use a secondary 5%-aligned tick when there is room.
+        const innerTick = axisMax > 10 ? Math.max(5, Math.round((axisMax * 0.5) / 5) * 5) : null;
+        const gridTicks = [-axisMax];
+        if (innerTick != null && innerTick < axisMax) gridTicks.push(-innerTick, innerTick);
+        gridTicks.push(axisMax);
         const y0 = yOf(0);
         ctx.lineWidth = 1;
-        [-axisMax, -10, 10, axisMax].forEach(function (v) {
+        gridTicks.forEach(function (v) {
           if (v === 0 || Math.abs(v) > axisMax) return;
           const gy = yOf(v);
           ctx.strokeStyle = "#c9cdd2";
@@ -3137,11 +3149,11 @@ function renderMarket(data) {
         ctx.font = "11px sans-serif";
         ctx.textAlign = "right";
         ctx.fillText("0", pad.l - 6, y0 + 4);
-        [axisMax, 10].forEach(function (v) {
+        [axisMax, innerTick].filter(function (v) { return v != null && v <= axisMax; }).forEach(function (v) {
           ctx.fillStyle = "#bd3c42";
           ctx.fillText(fmtCsbl(v), pad.l - 6, yOf(v) + 4);
         });
-        [-10, -axisMax].forEach(function (v) {
+        [innerTick, -axisMax].filter(function (v) { return v != null && Math.abs(v) <= axisMax; }).forEach(function (v) {
           ctx.fillStyle = "#2c9860";
           ctx.fillText(fmtCsbl(v), pad.l - 6, yOf(v) + 4);
         });
